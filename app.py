@@ -455,10 +455,11 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Three-column layout for compact display
-col_upload, col_settings, col_preview = st.columns([1, 1, 1], gap="medium")
+# Main layout: Settings on left, Images on right
+col_settings, col_images = st.columns([1, 2], gap="large")
 
-with col_upload:
+with col_settings:
+    # Upload section
     st.markdown('<div class="section-title">📁 Upload Image</div>', unsafe_allow_html=True)
     
     uploaded_file = st.file_uploader(
@@ -469,14 +470,11 @@ with col_upload:
     
     if uploaded_file:
         image = Image.open(uploaded_file)
-        
-        st.markdown('<div class="image-container">', unsafe_allow_html=True)
-        st.markdown('<div class="image-label">Original Image</div>', unsafe_allow_html=True)
-        st.image(image, use_container_width=True)
-        st.markdown(f'<div style="color: #808090; font-size: 0.8rem;">{image.size[0]} × {image.size[1]} pixels</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-with col_settings:
+        st.markdown(f'<div style="color: #e8b478; font-size: 0.85rem;">✓ Loaded: {image.size[0]} × {image.size[1]} px</div>', unsafe_allow_html=True)
+    
+    st.markdown("<hr style='margin: 1rem 0;'>", unsafe_allow_html=True)
+    
+    # Settings section
     st.markdown('<div class="section-title">⚙️ Settings</div>', unsafe_allow_html=True)
     
     # Radio buttons for conversion mode (all 3 visible)
@@ -496,29 +494,27 @@ with col_settings:
     # Unit explanation
     st.markdown("""
     <div class="unit-info">
-        💡 <strong>Drawing Units</strong> are scalable — enter values as µm, mm, inches, or any unit your CAD/laser software expects.
+        💡 <strong>Drawing Units</strong> are scalable — enter values as µm, mm, inches, or any unit.
     </div>
     """, unsafe_allow_html=True)
     
-    col_h, col_s = st.columns(2)
-    with col_h:
-        output_height = st.number_input(
-            "Output Height",
-            min_value=1.0,
-            max_value=1000000.0,
-            value=1000.0,
-            step=100.0,
-            help="Height in your chosen drawing units"
-        )
-    with col_s:
-        spot_size = st.number_input(
-            "Tool / Laser Spot Size",
-            min_value=0.1,
-            max_value=1000.0,
-            value=5.0,
-            step=1.0,
-            help="Tool or laser spot size in same units"
-        )
+    output_height = st.number_input(
+        "Output Height",
+        min_value=1.0,
+        max_value=1000000.0,
+        value=1000.0,
+        step=100.0,
+        help="Height in your chosen drawing units"
+    )
+    
+    spot_size = st.number_input(
+        "Tool / Laser Spot Size",
+        min_value=0.1,
+        max_value=1000.0,
+        value=5.0,
+        step=1.0,
+        help="Tool or laser spot size in same units"
+    )
     
     # Mode-specific settings
     if mode == "threshold":
@@ -542,7 +538,8 @@ with col_settings:
         outline_levels = 2
         smoothing = 2.0
     
-    # Options in a row
+    # Options
+    st.markdown('<div style="color: #e8d5b5; font-size: 0.9rem; margin-top: 0.5rem;">Options</div>', unsafe_allow_html=True)
     col_o1, col_o2 = st.columns(2)
     with col_o1:
         invert = st.checkbox("Invert", value=False)
@@ -550,9 +547,7 @@ with col_settings:
     with col_o2:
         bidirectional = st.checkbox("Bidirectional", value=True)
 
-with col_preview:
-    st.markdown('<div class="section-title">👁️ Preview</div>', unsafe_allow_html=True)
-    
+with col_images:
     if uploaded_file:
         # Calculate parameters for preview
         w, h = image.size
@@ -562,14 +557,23 @@ with col_preview:
         min_spacing = spot_size * 1.1
         line_step = max(1, int(math.ceil(min_spacing / pixel_size_y)))
         
-        # Generate preview
-        st.markdown('<div class="image-container">', unsafe_allow_html=True)
-        st.markdown('<div class="image-label">DXF Preview</div>', unsafe_allow_html=True)
-        preview_img = generate_preview(image, mode, threshold, invert, line_step, brightness, contrast)
-        st.image(preview_img, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Two images side by side
+        col_orig, col_preview = st.columns(2, gap="small")
         
-        # Compact stats
+        with col_orig:
+            st.markdown('<div class="image-container">', unsafe_allow_html=True)
+            st.markdown('<div class="image-label">Original Image</div>', unsafe_allow_html=True)
+            st.image(image, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        with col_preview:
+            st.markdown('<div class="image-container" style="background: #ffffff;">', unsafe_allow_html=True)
+            st.markdown('<div class="image-label" style="color: #1a1a2e;">DXF Preview</div>', unsafe_allow_html=True)
+            preview_img = generate_preview(image, mode, threshold, invert, line_step, brightness, contrast)
+            st.image(preview_img, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Stats below both images
         st.markdown(f"""
         <div class="stats-grid">
             <div class="stat-box">
@@ -591,11 +595,20 @@ with col_preview:
         </div>
         """, unsafe_allow_html=True)
     else:
+        # Placeholder when no image
         st.markdown("""
-        <div class="image-container" style="min-height: 150px; display: flex; align-items: center; justify-content: center; background: #f0f0f0;">
-            <div style="text-align: center; color: #909090;">
-                <div style="font-size: 1.5rem;">👁️</div>
-                <div style="font-size: 0.85rem;">Upload an image to see preview</div>
+        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+            <div class="image-container" style="flex: 1; min-height: 250px; display: flex; align-items: center; justify-content: center;">
+                <div style="text-align: center; color: #606070;">
+                    <div style="font-size: 2rem;">🖼️</div>
+                    <div style="font-size: 0.85rem;">Original</div>
+                </div>
+            </div>
+            <div class="image-container" style="flex: 1; min-height: 250px; display: flex; align-items: center; justify-content: center; background: #f5f5f5;">
+                <div style="text-align: center; color: #909090;">
+                    <div style="font-size: 2rem;">👁️</div>
+                    <div style="font-size: 0.85rem;">Preview</div>
+                </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
