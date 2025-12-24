@@ -4,7 +4,7 @@ A beautifully designed web service for converting bitmap images to DXF format
 """
 
 import streamlit as st
-from PIL import Image, ImageDraw, ImageFilter, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageEnhance
 import io
 import base64
 import math
@@ -17,7 +17,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Beautiful custom CSS with improved text legibility
+# Beautiful custom CSS with fixed input text colors
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+Pro:wght@300;400;600&display=swap');
@@ -47,7 +47,7 @@ st.markdown("""
         font-family: 'Source Sans Pro', sans-serif !important;
     }
     
-    /* FIXED: Make all form labels and text legible */
+    /* Make all form labels legible */
     .stSelectbox label, .stNumberInput label, .stSlider label, 
     .stCheckbox label, .stRadio label, .stTextInput label,
     .stFileUploader label {
@@ -55,14 +55,23 @@ st.markdown("""
         font-weight: 500 !important;
     }
     
-    .stSelectbox p, .stNumberInput p, .stSlider p,
-    .stCheckbox p, .stRadio p {
-        color: #c8b8a0 !important;
+    /* Make checkbox and radio text visible */
+    .stCheckbox span, .stRadio span, .stCheckbox p, .stRadio p,
+    .stRadio label span, .stRadio div[data-testid="stMarkdownContainer"] p {
+        color: #e8d5b5 !important;
     }
     
-    /* Make checkbox and radio text visible */
-    .stCheckbox span, .stRadio span {
-        color: #e8d5b5 !important;
+    /* FIXED: Input field text - BLACK on white background */
+    .stNumberInput input, .stTextInput input {
+        background: #ffffff !important;
+        border: 1px solid rgba(232,180,120,0.5) !important;
+        color: #1a1a2e !important;
+        border-radius: 6px !important;
+    }
+    
+    .stNumberInput input:focus, .stTextInput input:focus {
+        border-color: #e8b478 !important;
+        box-shadow: 0 0 0 2px rgba(232,180,120,0.2) !important;
     }
     
     /* Hero header */
@@ -129,6 +138,18 @@ st.markdown("""
         text-transform: uppercase;
         letter-spacing: 1px;
         margin-bottom: 0.3rem;
+    }
+    
+    /* Radio button styling */
+    .stRadio > div {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(232,180,120,0.2);
+        border-radius: 8px;
+        padding: 0.5rem;
+    }
+    
+    .stRadio > div > div {
+        gap: 0.3rem !important;
     }
     
     /* Coffee tier cards */
@@ -268,23 +289,20 @@ st.markdown("""
         color: #e8d5b5 !important;
     }
     
-    /* Input fields */
-    .stNumberInput input, .stTextInput input {
-        background: rgba(255,255,255,0.08) !important;
-        border-color: rgba(232,180,120,0.3) !important;
-        color: #f8f0e3 !important;
-    }
-    
     /* Select boxes */
     .stSelectbox > div > div {
-        background: rgba(255,255,255,0.08) !important;
-        border-color: rgba(232,180,120,0.3) !important;
-        color: #f8f0e3 !important;
+        background: #ffffff !important;
+        border-color: rgba(232,180,120,0.5) !important;
+        color: #1a1a2e !important;
     }
     
     /* Sliders */
     .stSlider > div > div > div {
         background: #e8b478 !important;
+    }
+    
+    .stSlider label {
+        color: #e8d5b5 !important;
     }
     
     /* Info boxes */
@@ -335,10 +353,19 @@ PAYMENT_LINKS = {
 converter = BitmapToDXFConverter()
 
 
-def generate_preview(image, mode, threshold, invert, line_step):
-    """Generate a high-fidelity preview of the DXF output."""
+def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, contrast=1.0):
+    """Generate a high-fidelity preview of the DXF output with thin lines."""
     img = image.copy().convert('L')
     w, h = img.size
+    
+    # Apply brightness and contrast adjustments for dithering mode
+    if mode == "floyd_steinberg":
+        if brightness != 1.0:
+            enhancer = ImageEnhance.Brightness(img)
+            img = enhancer.enhance(brightness)
+        if contrast != 1.0:
+            enhancer = ImageEnhance.Contrast(img)
+            img = enhancer.enhance(contrast)
     
     # Create preview image (dark background like the app theme)
     preview = Image.new('RGB', (w, h), '#1a1a2e')
@@ -371,15 +398,18 @@ def generate_preview(image, mode, threshold, invert, line_step):
                     if x + 1 < w:
                         data[y + 1][x + 1] += error * 1 / 16
         
-        # Draw dots at actual line_step intervals
-        dot_radius = max(1, line_step // 3)
+        # Draw small dots at actual line_step intervals
+        dot_radius = max(0, min(1, line_step // 4))  # Smaller dots
         for y in range(0, h, line_step):
             for x in range(0, w, line_step):
                 if data[y][x] < 128:
-                    draw.ellipse(
-                        [x - dot_radius, y - dot_radius, x + dot_radius, y + dot_radius],
-                        fill='#e8b478'
-                    )
+                    if dot_radius == 0:
+                        draw.point((x, y), fill='#e8b478')
+                    else:
+                        draw.ellipse(
+                            [x - dot_radius, y - dot_radius, x + dot_radius, y + dot_radius],
+                            fill='#e8b478'
+                        )
     
     elif mode == "outline":
         # Marching squares edge detection for accurate preview
@@ -387,15 +417,14 @@ def generate_preview(image, mode, threshold, invert, line_step):
         edges_img = edges_img.filter(ImageFilter.SMOOTH)
         edges_px = edges_img.load()
         
-        # Draw contour lines
+        # Draw thin contour lines
         for y in range(h):
             for x in range(w):
                 if edges_px[x, y] > 40:
-                    # Draw small dot for each edge pixel
                     draw.point((x, y), fill='#e8b478')
     
     else:  # threshold mode
-        # Draw actual horizontal scan lines exactly as DXF will have them
+        # Draw thin horizontal scan lines exactly as DXF will have them
         for y in range(0, h, line_step):
             x = 0
             while x < w:
@@ -409,9 +438,9 @@ def generate_preview(image, mode, threshold, invert, line_step):
                 while x < w and px[x, y] < threshold:
                     x += 1
                 x2 = x
-                # Draw line segment
+                # Draw thin line segment (width=1)
                 if x2 > x1:
-                    draw.line([(x1, y), (x2, y)], fill='#e8b478', width=max(1, line_step // 2))
+                    draw.line([(x1, y), (x2, y)], fill='#e8b478', width=1)
     
     return preview
 
@@ -459,14 +488,16 @@ with col_upload:
 with col_settings:
     st.markdown('<div class="section-title">⚙️ Settings</div>', unsafe_allow_html=True)
     
-    mode = st.selectbox(
+    # Radio buttons for conversion mode (all 3 visible)
+    mode = st.radio(
         "Conversion Mode",
         options=["threshold", "floyd_steinberg", "outline"],
         format_func=lambda x: {
             "threshold": "🔲 Threshold (Lines)",
             "floyd_steinberg": "⚫ Dithering (Dots)",
             "outline": "✏️ Outline (Contours)"
-        }[x]
+        }[x],
+        horizontal=False
     )
     
     st.markdown('<div class="section-title" style="margin-top: 1rem;">📐 Dimensions</div>', unsafe_allow_html=True)
@@ -490,19 +521,28 @@ with col_settings:
         )
     with col_s:
         spot_size = st.number_input(
-            "Spot Size",
+            "Tool / Laser Spot Size",
             min_value=0.1,
             max_value=1000.0,
             value=5.0,
             step=1.0,
-            help="Laser/tool spot size in same units"
+            help="Tool or laser spot size in same units"
         )
     
     # Mode-specific settings
     if mode == "threshold":
         threshold = st.slider("Threshold", 0, 255, 200, help="Pixels darker than this become marks")
+        brightness = 1.0
+        contrast = 1.0
+    elif mode == "floyd_steinberg":
+        threshold = 200
+        st.markdown('<div style="color: #e8d5b5; font-size: 0.9rem; margin-top: 0.5rem;">Image Adjustments</div>', unsafe_allow_html=True)
+        brightness = st.slider("Brightness", 0.2, 2.0, 1.0, 0.1, help="Adjust image brightness before dithering")
+        contrast = st.slider("Contrast", 0.2, 2.0, 1.0, 0.1, help="Adjust image contrast before dithering")
     else:
         threshold = 200
+        brightness = 1.0
+        contrast = 1.0
     
     if mode == "outline":
         outline_levels = st.slider("Contour Levels", 2, 16, 2)
@@ -534,7 +574,7 @@ with col_preview:
         # Generate preview
         st.markdown('<div class="image-container">', unsafe_allow_html=True)
         st.markdown('<div class="image-label">DXF Preview</div>', unsafe_allow_html=True)
-        preview_img = generate_preview(image, mode, threshold, invert, line_step)
+        preview_img = generate_preview(image, mode, threshold, invert, line_step, brightness, contrast)
         st.image(preview_img, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
         
@@ -623,10 +663,23 @@ if uploaded_file:
         with st.spinner("Converting..."):
             try:
                 uploaded_file.seek(0)
-                image_bytes = uploaded_file.read()
+                
+                # For dithering mode, apply brightness/contrast to image before conversion
+                if mode == "floyd_steinberg" and (brightness != 1.0 or contrast != 1.0):
+                    img_for_conversion = image.copy().convert('L')
+                    if brightness != 1.0:
+                        enhancer = ImageEnhance.Brightness(img_for_conversion)
+                        img_for_conversion = enhancer.enhance(brightness)
+                    if contrast != 1.0:
+                        enhancer = ImageEnhance.Contrast(img_for_conversion)
+                        img_for_conversion = enhancer.enhance(contrast)
+                    image_input = img_for_conversion
+                else:
+                    uploaded_file.seek(0)
+                    image_input = uploaded_file.read()
                 
                 dxf_content, stats = converter.convert(
-                    input_image=image_bytes,
+                    input_image=image_input,
                     mode=mode,
                     image_height_um=output_height,
                     spot_size_um=spot_size,
