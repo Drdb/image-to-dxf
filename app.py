@@ -122,10 +122,10 @@ st.markdown("""
         margin: 0.5rem 0;
     }
     
-    /* Image container - smaller */
+    /* Image container - smaller, with visible border for white backgrounds */
     .image-container {
         background: rgba(0,0,0,0.3);
-        border: 1px solid rgba(232,180,120,0.3);
+        border: 2px solid rgba(232,180,120,0.4);
         border-radius: 8px;
         padding: 0.5rem;
         text-align: center;
@@ -354,7 +354,7 @@ converter = BitmapToDXFConverter()
 
 
 def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, contrast=1.0):
-    """Generate a high-fidelity preview of the DXF output with thin lines."""
+    """Generate a high-fidelity preview of the DXF output - black on white like CAD software."""
     img = image.copy().convert('L')
     w, h = img.size
     
@@ -367,8 +367,8 @@ def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, 
             enhancer = ImageEnhance.Contrast(img)
             img = enhancer.enhance(contrast)
     
-    # Create preview image (dark background like the app theme)
-    preview = Image.new('RGB', (w, h), '#1a1a2e')
+    # Create preview image - WHITE background, BLACK lines (like CAD software)
+    preview = Image.new('RGB', (w, h), '#ffffff')
     draw = ImageDraw.Draw(preview)
     
     # Apply inversion to source if needed
@@ -398,17 +398,17 @@ def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, 
                     if x + 1 < w:
                         data[y + 1][x + 1] += error * 1 / 16
         
-        # Draw small dots at actual line_step intervals
-        dot_radius = max(0, min(1, line_step // 4))  # Smaller dots
+        # Draw small BLACK dots at actual line_step intervals
+        dot_radius = max(0, min(1, line_step // 4))
         for y in range(0, h, line_step):
             for x in range(0, w, line_step):
                 if data[y][x] < 128:
                     if dot_radius == 0:
-                        draw.point((x, y), fill='#e8b478')
+                        draw.point((x, y), fill='#000000')
                     else:
                         draw.ellipse(
                             [x - dot_radius, y - dot_radius, x + dot_radius, y + dot_radius],
-                            fill='#e8b478'
+                            fill='#000000'
                         )
     
     elif mode == "outline":
@@ -417,14 +417,14 @@ def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, 
         edges_img = edges_img.filter(ImageFilter.SMOOTH)
         edges_px = edges_img.load()
         
-        # Draw thin contour lines
+        # Draw thin BLACK contour lines
         for y in range(h):
             for x in range(w):
                 if edges_px[x, y] > 40:
-                    draw.point((x, y), fill='#e8b478')
+                    draw.point((x, y), fill='#000000')
     
     else:  # threshold mode
-        # Draw thin horizontal scan lines exactly as DXF will have them
+        # Draw thin BLACK horizontal scan lines exactly as DXF will have them
         for y in range(0, h, line_step):
             x = 0
             while x < w:
@@ -438,9 +438,9 @@ def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, 
                 while x < w and px[x, y] < threshold:
                     x += 1
                 x2 = x
-                # Draw thin line segment (width=1)
+                # Draw thin BLACK line segment (width=1)
                 if x2 > x1:
-                    draw.line([(x1, y), (x2, y)], fill='#e8b478', width=1)
+                    draw.line([(x1, y), (x2, y)], fill='#000000', width=1)
     
     return preview
 
@@ -462,9 +462,9 @@ with col_upload:
     st.markdown('<div class="section-title">📁 Upload Image</div>', unsafe_allow_html=True)
     
     uploaded_file = st.file_uploader(
-        "Choose file",
+        "Drag & drop or click to browse",
         type=["png", "jpg", "jpeg", "bmp", "gif", "tiff"],
-        label_visibility="collapsed"
+        help="Supported formats: PNG, JPG, BMP, GIF, TIFF"
     )
     
     if uploaded_file:
@@ -475,15 +475,6 @@ with col_upload:
         st.image(image, use_container_width=True)
         st.markdown(f'<div style="color: #808090; font-size: 0.8rem;">{image.size[0]} × {image.size[1]} pixels</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        st.markdown("""
-        <div class="custom-card" style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
-            <div style="text-align: center; color: #606070;">
-                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🖼️</div>
-                <div>Drop image here</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
 
 with col_settings:
     st.markdown('<div class="section-title">⚙️ Settings</div>', unsafe_allow_html=True)
@@ -601,10 +592,10 @@ with col_preview:
         """, unsafe_allow_html=True)
     else:
         st.markdown("""
-        <div class="custom-card" style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
-            <div style="text-align: center; color: #606070;">
-                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">👁️</div>
-                <div>Preview appears here</div>
+        <div class="image-container" style="min-height: 150px; display: flex; align-items: center; justify-content: center; background: #f0f0f0;">
+            <div style="text-align: center; color: #909090;">
+                <div style="font-size: 1.5rem;">👁️</div>
+                <div style="font-size: 0.85rem;">Upload an image to see preview</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
