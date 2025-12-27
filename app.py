@@ -603,15 +603,34 @@ with col_images:
         """, unsafe_allow_html=True)
         
         col_ex1, col_ex2, col_ex3 = st.columns(3)
+        
+        # Load example images safely - won't crash if files are missing
+        import os
+        example_path = os.path.join(os.path.dirname(__file__), "examples")
+        
         with col_ex1:
             st.markdown('<div style="text-align: center; color: #e8b478; font-size: 0.8rem; margin-bottom: 0.3rem;">🥤 Simple (Outline)</div>', unsafe_allow_html=True)
-            st.image("examples/simple_outline.png", use_container_width=True)
+            simple_path = os.path.join(example_path, "simple_outline.png")
+            if os.path.exists(simple_path):
+                st.image(simple_path, use_container_width=True)
+            else:
+                st.markdown('<div style="background: #2a2a3e; padding: 2rem; text-align: center; border-radius: 8px; color: #666;">Example image</div>', unsafe_allow_html=True)
+        
         with col_ex2:
             st.markdown('<div style="text-align: center; color: #e8b478; font-size: 0.8rem; margin-bottom: 0.3rem;">☕ Medium (Threshold)</div>', unsafe_allow_html=True)
-            st.image("examples/medium_threshold.png", use_container_width=True)
+            medium_path = os.path.join(example_path, "medium_threshold.png")
+            if os.path.exists(medium_path):
+                st.image(medium_path, use_container_width=True)
+            else:
+                st.markdown('<div style="background: #2a2a3e; padding: 2rem; text-align: center; border-radius: 8px; color: #666;">Example image</div>', unsafe_allow_html=True)
+        
         with col_ex3:
             st.markdown('<div style="text-align: center; color: #e8b478; font-size: 0.8rem; margin-bottom: 0.3rem;">✨ Complex (Dithering)</div>', unsafe_allow_html=True)
-            st.image("examples/complex_dithering.png", use_container_width=True)
+            complex_path = os.path.join(example_path, "complex_dithering.png")
+            if os.path.exists(complex_path):
+                st.image(complex_path, use_container_width=True)
+            else:
+                st.markdown('<div style="background: #2a2a3e; padding: 2rem; text-align: center; border-radius: 8px; color: #666;">Example image</div>', unsafe_allow_html=True)
     else:
         # Placeholder when no image
         st.markdown("""
