@@ -512,33 +512,39 @@ with col_settings:
 
 with col_images:
     if uploaded_file:
-        # Image adjustment controls - right above the preview for easy adjustment
-        st.markdown('<div class="section-title" style="margin-bottom: 0.5rem;">🎨 Image Adjustments</div>', unsafe_allow_html=True)
+        # Create containers to control visual order
+        # Images will appear first, controls below
+        image_container = st.container()
+        controls_container = st.container()
         
-        # Dimensions - Output Height and Spot Size
-        st.markdown('<div style="color: #e8d5b5; font-size: 0.85rem; margin-bottom: 0.25rem;">📐 Dimensions (scalable units: µm, mm, inches, etc.)</div>', unsafe_allow_html=True)
-        col_h, col_s = st.columns(2)
-        with col_h:
-            output_height = st.number_input("Output Height", min_value=1.0, max_value=1000000.0, value=1000.0, step=100.0)
-        with col_s:
-            spot_size = st.number_input("Tool / Spot Size", min_value=0.1, max_value=1000.0, value=5.0, step=1.0)
-        
-        # Threshold slider - available for all modes
-        threshold = st.slider("Threshold", 0, 255, 200, help="Pixels darker than this become marks")
-        
-        # Brightness and Contrast - available for all modes
-        col_b, col_c = st.columns(2)
-        with col_b:
-            brightness = st.slider("Brightness", 0.2, 2.0, 1.0, 0.1, help="Adjust image brightness")
-        with col_c:
-            contrast = st.slider("Contrast", 0.2, 2.0, 1.0, 0.1, help="Adjust image contrast")
-        
-        # Contour Levels and Smoothing - available for all modes
-        col_ol, col_sm = st.columns(2)
-        with col_ol:
-            outline_levels = st.slider("Contour Levels", 2, 16, 2)
-        with col_sm:
-            smoothing = st.slider("Smoothing", 0.0, 10.0, 2.0)
+        # Define controls FIRST (to get values) but in the second container
+        with controls_container:
+            st.markdown('<div class="section-title" style="margin-top: 1rem; margin-bottom: 0.5rem;">🎨 Image Adjustments</div>', unsafe_allow_html=True)
+            
+            # Dimensions - Output Height and Spot Size
+            st.markdown('<div style="color: #e8d5b5; font-size: 0.85rem; margin-bottom: 0.25rem;">📐 Dimensions (scalable units: µm, mm, inches, etc.)</div>', unsafe_allow_html=True)
+            col_h, col_s = st.columns(2)
+            with col_h:
+                output_height = st.number_input("Output Height", min_value=1.0, max_value=1000000.0, value=1000.0, step=100.0)
+            with col_s:
+                spot_size = st.number_input("Tool / Spot Size", min_value=0.1, max_value=1000.0, value=5.0, step=1.0)
+            
+            # Threshold slider - available for all modes
+            threshold = st.slider("Threshold", 0, 255, 200, help="Pixels darker than this become marks")
+            
+            # Brightness and Contrast - available for all modes
+            col_b, col_c = st.columns(2)
+            with col_b:
+                brightness = st.slider("Brightness", 0.2, 2.0, 1.0, 0.1, help="Adjust image brightness")
+            with col_c:
+                contrast = st.slider("Contrast", 0.2, 2.0, 1.0, 0.1, help="Adjust image contrast")
+            
+            # Contour Levels and Smoothing - available for all modes
+            col_ol, col_sm = st.columns(2)
+            with col_ol:
+                outline_levels = st.slider("Contour Levels", 2, 16, 2)
+            with col_sm:
+                smoothing = st.slider("Smoothing", 0.0, 10.0, 2.0)
         
         # Calculate parameters for preview
         w, h = image.size
@@ -548,43 +554,45 @@ with col_images:
         min_spacing = spot_size * 1.1
         line_step = max(1, int(math.ceil(min_spacing / pixel_size_y)))
         
-        # Two images side by side
-        col_orig, col_preview = st.columns(2, gap="small")
-        
-        with col_orig:
-            st.markdown('<div class="image-container">', unsafe_allow_html=True)
-            st.markdown('<div class="image-label">Original Image</div>', unsafe_allow_html=True)
-            st.image(image, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        with col_preview:
-            st.markdown('<div class="image-container" style="background: #ffffff;">', unsafe_allow_html=True)
-            st.markdown('<div class="image-label" style="color: #1a1a2e;">DXF Preview</div>', unsafe_allow_html=True)
-            preview_img = generate_preview(image, mode, threshold, invert, line_step, brightness, contrast)
-            st.image(preview_img, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Stats below both images
-        st.markdown(f"""
-        <div class="stats-grid">
-            <div class="stat-box">
-                <div class="stat-value">{output_width:.0f}</div>
-                <div class="stat-label">Width</div>
+        # Now fill the IMAGE container (appears FIRST visually)
+        with image_container:
+            # Two images side by side
+            col_orig, col_preview = st.columns(2, gap="small")
+            
+            with col_orig:
+                st.markdown('<div class="image-container">', unsafe_allow_html=True)
+                st.markdown('<div class="image-label">Original Image</div>', unsafe_allow_html=True)
+                st.image(image, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            with col_preview:
+                st.markdown('<div class="image-container" style="background: #ffffff;">', unsafe_allow_html=True)
+                st.markdown('<div class="image-label" style="color: #1a1a2e;">DXF Preview</div>', unsafe_allow_html=True)
+                preview_img = generate_preview(image, mode, threshold, invert, line_step, brightness, contrast)
+                st.image(preview_img, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Stats below both images
+            st.markdown(f"""
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value">{output_width:.0f}</div>
+                    <div class="stat-label">Width</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{output_height:.0f}</div>
+                    <div class="stat-label">Height</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{line_step}</div>
+                    <div class="stat-label">Step</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{h // line_step}</div>
+                    <div class="stat-label">Lines</div>
+                </div>
             </div>
-            <div class="stat-box">
-                <div class="stat-value">{output_height:.0f}</div>
-                <div class="stat-label">Height</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-value">{line_step}</div>
-                <div class="stat-label">Step</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-value">{h // line_step}</div>
-                <div class="stat-label">Lines</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
     else:
         # Defaults when no image uploaded
         output_height = 1000.0
