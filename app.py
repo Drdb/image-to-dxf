@@ -357,9 +357,9 @@ st.markdown("""
 
 # Payment links (Stripe - LIVE)
 PAYMENT_LINKS = {
-    "deli_coffee": "https://buy.stripe.com/4gM7sK7524Lrarof3Ibo400",
+    "deli_coffee": "https://buy.stripe.com/dRm28qcpmgu9fLI6xcbo402",
     "cappuccino": "https://buy.stripe.com/5kQ6oG896b9PdDAcVAbo401",
-    "specialty_espresso": "https://buy.stripe.com/dRm28qcpmgu9fLI6xcbo402"
+    "specialty_espresso": "https://buy.stripe.com/4gM7sK7524Lrarof3Ibo400"
 }
 
 # Initialize converter
