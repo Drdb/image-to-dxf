@@ -1,385 +1,267 @@
 """
-Image to DXF Converter - Web Application
-A beautifully designed web service for converting bitmap images to DXF format
+Bitmap to DXF Converter - Core Engine
+Converts bitmap images to DXF format with multiple modes:
+- Threshold (lines)
+- Floyd-Steinberg Dithering (dots)
+- Outline (contours)
 """
 
-import streamlit as st
-from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageEnhance
-import io
-import base64
+from PIL import Image
+from pathlib import Path
 import math
-from converter import BitmapToDXFConverter
-
-# Page configuration
-st.set_page_config(
-    page_title="Image to DXF Converter",
-    page_icon="☕",
-    layout="wide"
-)
-
-# Beautiful custom CSS with fixed input text colors
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Source+Sans+Pro:wght@300;400;600&display=swap');
-    
-    /* Global styles */
-    .stApp {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-    }
-    
-    /* Hide Streamlit branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    
-    /* Main container */
-    .main .block-container {
-        padding-top: 2rem;
-        max-width: 1400px;
-    }
-    
-    /* Typography */
-    h1, h2, h3 {
-        font-family: 'Playfair Display', Georgia, serif !important;
-        color: #f8f0e3 !important;
-    }
-    
-    p, li, span, label, .stMarkdown {
-        font-family: 'Source Sans Pro', sans-serif !important;
-    }
-    
-    /* Make all form labels legible */
-    .stSelectbox label, .stNumberInput label, .stSlider label, 
-    .stCheckbox label, .stRadio label, .stTextInput label,
-    .stFileUploader label {
-        color: #e8d5b5 !important;
-        font-weight: 500 !important;
-    }
-    
-    /* Make checkbox and radio text visible */
-    .stCheckbox span, .stRadio span, .stCheckbox p, .stRadio p,
-    .stRadio label span, .stRadio div[data-testid="stMarkdownContainer"] p {
-        color: #e8d5b5 !important;
-    }
-    
-    /* FIXED: Input field text - BLACK on white background */
-    .stNumberInput input, .stTextInput input {
-        background: #ffffff !important;
-        border: 1px solid rgba(232,180,120,0.5) !important;
-        color: #1a1a2e !important;
-        border-radius: 6px !important;
-    }
-    
-    .stNumberInput input:focus, .stTextInput input:focus {
-        border-color: #e8b478 !important;
-        box-shadow: 0 0 0 2px rgba(232,180,120,0.2) !important;
-    }
-    
-    /* Hero header */
-    .hero-container {
-        text-align: center;
-        padding: 1.5rem 1rem;
-        margin-bottom: 1.5rem;
-        background: linear-gradient(180deg, rgba(232,180,120,0.1) 0%, rgba(0,0,0,0) 100%);
-        border-radius: 20px;
-    }
-    
-    .hero-title {
-        font-family: 'Playfair Display', Georgia, serif;
-        font-size: 2.8rem;
-        font-weight: 700;
-        color: #e8b478;
-        margin-bottom: 0.5rem;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        letter-spacing: 2px;
-    }
-    
-    .hero-subtitle {
-        font-family: 'Source Sans Pro', sans-serif;
-        font-size: 1.1rem;
-        color: #a0a0b0;
-        font-weight: 300;
-        letter-spacing: 1px;
-    }
-    
-    /* Section titles */
-    .section-title {
-        font-family: 'Playfair Display', Georgia, serif;
-        font-size: 1.2rem;
-        color: #e8b478;
-        margin-bottom: 0.8rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-    
-    /* Cards */
-    .custom-card {
-        background: rgba(255,255,255,0.05);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(232,180,120,0.2);
-        border-radius: 12px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-    }
-    
-    /* Image container - smaller, with visible border for white backgrounds */
-    .image-container {
-        background: rgba(0,0,0,0.3);
-        border: 2px solid rgba(232,180,120,0.4);
-        border-radius: 8px;
-        padding: 0.5rem;
-        text-align: center;
-    }
-    
-    .image-label {
-        font-family: 'Source Sans Pro', sans-serif;
-        font-size: 0.75rem;
-        color: #e8b478;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-bottom: 0.3rem;
-    }
-    
-    /* Radio button styling */
-    .stRadio > div {
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(232,180,120,0.2);
-        border-radius: 8px;
-        padding: 0.5rem;
-    }
-    
-    .stRadio > div > div {
-        gap: 0.3rem !important;
-    }
-    
-    /* Coffee tier cards */
-    .coffee-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 0.8rem;
-        margin: 1rem 0;
-    }
-    
-    .coffee-card {
-        background: linear-gradient(145deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
-        border: 1px solid rgba(232,180,120,0.3);
-        border-radius: 12px;
-        padding: 1rem;
-        text-align: center;
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .coffee-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 3px;
-        background: linear-gradient(90deg, #e8b478, #d4a574, #c9956c);
-    }
-    
-    .coffee-card:hover {
-        transform: translateY(-3px);
-        border-color: #e8b478;
-        box-shadow: 0 8px 30px rgba(232,180,120,0.2);
-    }
-    
-    .coffee-icon {
-        font-size: 1.8rem;
-        margin-bottom: 0.3rem;
-    }
-    
-    .coffee-name {
-        font-family: 'Playfair Display', Georgia, serif;
-        font-size: 1.1rem;
-        color: #f8f0e3;
-        margin-bottom: 0.2rem;
-    }
-    
-    .coffee-price {
-        font-family: 'Source Sans Pro', sans-serif;
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: #e8b478;
-        margin: 0.3rem 0;
-    }
-    
-    .coffee-desc {
-        font-family: 'Source Sans Pro', sans-serif;
-        font-size: 0.8rem;
-        color: #a0a0b0;
-        line-height: 1.3;
-    }
-    
-    /* Stats display */
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 0.5rem;
-        margin: 0.5rem 0;
-    }
-    
-    .stat-box {
-        background: rgba(232,180,120,0.1);
-        border: 1px solid rgba(232,180,120,0.2);
-        border-radius: 8px;
-        padding: 0.6rem;
-        text-align: center;
-    }
-    
-    .stat-value {
-        font-family: 'Playfair Display', Georgia, serif;
-        font-size: 1.2rem;
-        color: #e8b478;
-        font-weight: 600;
-    }
-    
-    .stat-label {
-        font-family: 'Source Sans Pro', sans-serif;
-        font-size: 0.7rem;
-        color: #a0a0b0;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-    
-    /* Unit info box */
-    .unit-info {
-        background: rgba(232,180,120,0.08);
-        border-left: 3px solid #e8b478;
-        padding: 0.6rem 0.8rem;
-        margin: 0.5rem 0;
-        border-radius: 0 8px 8px 0;
-        font-size: 0.85rem;
-        color: #c8b8a0;
-    }
-    
-    /* Buttons */
-    .stButton > button {
-        font-family: 'Source Sans Pro', sans-serif !important;
-        font-weight: 600 !important;
-        letter-spacing: 1px !important;
-        border-radius: 8px !important;
-        transition: all 0.3s ease !important;
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 20px rgba(232,180,120,0.3) !important;
-    }
-    
-    /* Download button special styling */
-    .stDownloadButton > button {
-        background: linear-gradient(135deg, #e8b478 0%, #d4a574 100%) !important;
-        color: #1a1a2e !important;
-        font-weight: 600 !important;
-        border: none !important;
-    }
-    
-    /* File uploader */
-    .stFileUploader > div {
-        background: rgba(255,255,255,0.05) !important;
-        border: 2px dashed rgba(232,180,120,0.4) !important;
-        border-radius: 8px !important;
-    }
-    
-    .stFileUploader label {
-        color: #e8d5b5 !important;
-    }
-    
-    /* Select boxes */
-    .stSelectbox > div > div {
-        background: #ffffff !important;
-        border-color: rgba(232,180,120,0.5) !important;
-        color: #1a1a2e !important;
-    }
-    
-    /* Sliders */
-    .stSlider > div > div > div {
-        background: #e8b478 !important;
-    }
-    
-    .stSlider label {
-        color: #e8d5b5 !important;
-    }
-    
-    /* Info boxes */
-    .stAlert {
-        background: rgba(232,180,120,0.1) !important;
-        border: 1px solid rgba(232,180,120,0.3) !important;
-        border-radius: 8px !important;
-        color: #e8d5b5 !important;
-    }
-    
-    /* Divider */
-    hr {
-        border-color: rgba(232,180,120,0.2) !important;
-        margin: 1.5rem 0 !important;
-    }
-    
-    /* Footer */
-    .footer {
-        text-align: center;
-        padding: 1.5rem;
-        margin-top: 2rem;
-        border-top: 1px solid rgba(232,180,120,0.2);
-    }
-    
-    .footer-text {
-        font-family: 'Source Sans Pro', sans-serif;
-        color: #606070;
-        font-size: 0.85rem;
-    }
-    
-    /* Responsive */
-    @media (max-width: 768px) {
-        .hero-title { font-size: 2rem; }
-        .coffee-grid { grid-template-columns: 1fr; }
-        .stats-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# Payment links (Stripe - LIVE)
-PAYMENT_LINKS = {
-    "deli_coffee": "https://buy.stripe.com/4gM7sK7524Lrarof3Ibo400",
-    "cappuccino": "https://buy.stripe.com/5kQ6oG896b9PdDAcVAbo401",
-    "specialty_espresso": "https://buy.stripe.com/dRm28qcpmgu9fLI6xcbo402"
-}
-
-# Initialize converter
-converter = BitmapToDXFConverter()
+import io
 
 
-def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, contrast=1.0):
-    """Generate a high-fidelity preview of the DXF output - black on white like CAD software."""
-    img = image.copy().convert('L')
-    w, h = img.size
+class BitmapToDXFConverter:
+    """Core conversion engine for bitmap to DXF conversion."""
     
-    # Apply brightness and contrast adjustments for dithering mode
-    if mode == "floyd_steinberg":
-        if brightness != 1.0:
-            enhancer = ImageEnhance.Brightness(img)
-            img = enhancer.enhance(brightness)
-        if contrast != 1.0:
-            enhancer = ImageEnhance.Contrast(img)
-            img = enhancer.enhance(contrast)
+    def __init__(self):
+        pass
     
-    # Create preview image - WHITE background, BLACK lines (like CAD software)
-    preview = Image.new('RGB', (w, h), '#ffffff')
-    draw = ImageDraw.Draw(preview)
+    def convert(
+        self,
+        input_image,
+        mode="threshold",
+        image_height_um=1000.0,
+        spot_size_um=5.0,
+        spot_spacing_factor=1.1,
+        threshold=200,
+        invert=False,
+        flip_y=True,
+        bidirectional=True,
+        outline_levels=2,
+        smoothing_amount=2.0,
+        corner_threshold=45.0
+    ):
+        """
+        Convert an image to DXF format.
+        
+        Args:
+            input_image: PIL Image or file path or bytes
+            mode: "threshold", "floyd_steinberg", or "outline"
+            image_height_um: Target height in microns
+            spot_size_um: Laser spot size in microns
+            spot_spacing_factor: Spacing between spots (multiplier)
+            threshold: Threshold value for threshold mode (0-255)
+            invert: Swap black/white
+            flip_y: Flip Y axis for CAD orientation
+            bidirectional: Use zigzag scanning
+            outline_levels: Number of grayscale levels for outline mode
+            smoothing_amount: Smoothing for outline mode
+            corner_threshold: Corner detection angle for outline mode
+            
+        Returns:
+            tuple: (dxf_content_string, stats_dict)
+        """
+        # Load image
+        if isinstance(input_image, (str, Path)):
+            img = Image.open(input_image).convert("L")
+        elif isinstance(input_image, bytes):
+            img = Image.open(io.BytesIO(input_image)).convert("L")
+        elif isinstance(input_image, Image.Image):
+            img = input_image.convert("L")
+        else:
+            raise ValueError("input_image must be a file path, bytes, or PIL Image")
+        
+        w, h = img.size
+        
+        # Calculate dimensions
+        aspect_ratio = w / h
+        image_width_um = image_height_um * aspect_ratio
+        
+        pixel_size_x = image_width_um / w
+        pixel_size_y = image_height_um / h
+        
+        # Calculate line step based on spot size
+        min_spacing = spot_size_um * spot_spacing_factor
+        line_step = max(1, int(math.ceil(min_spacing / pixel_size_y)))
+        
+        # Apply dithering if needed
+        if mode == "floyd_steinberg":
+            if invert:
+                img = Image.eval(img, lambda x: 255 - x)
+            img = self._apply_floyd_steinberg_dithering(img)
+        
+        px = img.load()
+        
+        def is_black(v):
+            if mode == "floyd_steinberg":
+                return v < 128
+            else:
+                vb = v < threshold
+                return (not vb) if invert else vb
+        
+        # Build DXF content
+        dxf_lines = []
+        
+        # Header section (minimal DXF R12)
+        dxf_lines.extend(["0", "SECTION", "2", "HEADER"])
+        dxf_lines.extend(["9", "$ACADVER", "1", "AC1009"])
+        dxf_lines.extend(["0", "ENDSEC"])
+        
+        # Entities section
+        dxf_lines.extend(["0", "SECTION", "2", "ENTITIES"])
+        
+        entity_count = 0
+        
+        if mode == "floyd_steinberg":
+            # Dithering mode: create tiny LINE segments for each dot
+            dot_length = 1
+            
+            for y in range(0, h, line_step):
+                row_num = y // line_step
+                reverse = bidirectional and (row_num % 2 == 1)
+                
+                x_positions = range(0, w, line_step)
+                if reverse:
+                    x_positions = reversed(list(x_positions))
+                
+                for x in x_positions:
+                    if is_black(px[x, y]):
+                        X = round(x * pixel_size_x, 1)
+                        Y = round((h - 1 - y if flip_y else y) * pixel_size_y, 1)
+                        
+                        dxf_lines.extend([
+                            "0", "LINE",
+                            "8", "0",
+                            "10", f"{X:.1f}",
+                            "20", f"{Y:.1f}",
+                            "11", f"{X + dot_length:.1f}",
+                            "21", f"{Y:.1f}"
+                        ])
+                        entity_count += 1
+                        
+        elif mode == "outline":
+            # Outline mode: trace contours
+            num_levels = outline_levels
+            smoothing = smoothing_amount
+            corner_angle = corner_threshold
+            
+            if invert:
+                img = Image.eval(img, lambda x: 255 - x)
+            
+            all_polylines = []
+            
+            if num_levels == 2:
+                thresholds = [128]
+            else:
+                step = 256 // num_levels
+                thresholds = [step * i for i in range(1, num_levels)]
+            
+            for thresh in thresholds:
+                edges = self._find_contours_marching_squares(img, thresh)
+                polylines = self._trace_contours(edges)
+                
+                processed = []
+                for poly in polylines:
+                    if len(poly) >= 2:
+                        if smoothing > 0:
+                            smoothed = self._smooth_contour(poly, smoothing, corner_angle)
+                        else:
+                            smoothed = poly
+                        
+                        simp = self._simplify_polyline(smoothed, smoothing * 0.5 + 0.5)
+                        if len(simp) >= 2:
+                            processed.append(simp)
+                
+                all_polylines.extend(processed)
+            
+            # Optimize path
+            connection_tolerance = max(2.0, smoothing)
+            optimized = self._optimize_outline_path(all_polylines, connection_tolerance)
+            
+            # Write polylines as LINE segments
+            for poly in optimized:
+                for i in range(len(poly) - 1):
+                    x1, y1 = poly[i]
+                    x2, y2 = poly[i + 1]
+                    
+                    X1 = round(x1 * pixel_size_x, 1)
+                    Y1 = round((h - 1 - y1 if flip_y else y1) * pixel_size_y, 1)
+                    X2 = round(x2 * pixel_size_x, 1)
+                    Y2 = round((h - 1 - y2 if flip_y else y2) * pixel_size_y, 1)
+                    
+                    dxf_lines.extend([
+                        "0", "LINE",
+                        "8", "0",
+                        "10", f"{X1:.1f}",
+                        "20", f"{Y1:.1f}",
+                        "11", f"{X2:.1f}",
+                        "21", f"{Y2:.1f}"
+                    ])
+                    entity_count += 1
+                    
+        else:  # threshold mode
+            # Create LINE segments for each run
+            for y in range(0, h, line_step):
+                row_num = y // line_step
+                reverse = bidirectional and (row_num % 2 == 1)
+                
+                x = 0
+                row_segments = []
+                while x < w:
+                    while x < w and not is_black(px[x, y]):
+                        x += 1
+                    if x >= w:
+                        break
+                    x1 = x
+                    while x < w and is_black(px[x, y]):
+                        x += 1
+                    x2 = x - 1
+                    row_segments.append((x1, x2))
+                
+                Y = round((h - 1 - y if flip_y else y) * pixel_size_y, 1)
+                
+                if reverse:
+                    for x1, x2 in reversed(row_segments):
+                        X1 = round((x2 + 1) * pixel_size_x, 1)
+                        X2 = round(x1 * pixel_size_x, 1)
+                        dxf_lines.extend([
+                            "0", "LINE",
+                            "8", "0",
+                            "10", f"{X1:.1f}",
+                            "20", f"{Y:.1f}",
+                            "11", f"{X2:.1f}",
+                            "21", f"{Y:.1f}"
+                        ])
+                        entity_count += 1
+                else:
+                    for x1, x2 in row_segments:
+                        X1 = round(x1 * pixel_size_x, 1)
+                        X2 = round((x2 + 1) * pixel_size_x, 1)
+                        dxf_lines.extend([
+                            "0", "LINE",
+                            "8", "0",
+                            "10", f"{X1:.1f}",
+                            "20", f"{Y:.1f}",
+                            "11", f"{X2:.1f}",
+                            "21", f"{Y:.1f}"
+                        ])
+                        entity_count += 1
+        
+        # End file
+        dxf_lines.extend(["0", "ENDSEC", "0", "EOF"])
+        
+        dxf_content = "\n".join(dxf_lines)
+        
+        stats = {
+            "width_px": w,
+            "height_px": h,
+            "width_um": image_width_um,
+            "height_um": image_height_um,
+            "entity_count": entity_count,
+            "mode": mode,
+            "line_step": line_step,
+            "file_size_kb": len(dxf_content) / 1024
+        }
+        
+        return dxf_content, stats
     
-    # Apply inversion to source if needed
-    if invert:
-        img = ImageOps.invert(img)
-    
-    px = img.load()
-    
-    if mode == "floyd_steinberg":
-        # Apply actual Floyd-Steinberg dithering
+    def _apply_floyd_steinberg_dithering(self, img):
+        """Apply Floyd-Steinberg dithering to grayscale image."""
+        w, h = img.size
         pixels = list(img.getdata())
+        
         data = [[float(pixels[y * w + x]) for x in range(w)] for y in range(h)]
         
         for y in range(h):
@@ -398,394 +280,515 @@ def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, 
                     if x + 1 < w:
                         data[y + 1][x + 1] += error * 1 / 16
         
-        # Draw small BLACK dots at actual line_step intervals
-        dot_radius = max(0, min(1, line_step // 4))
-        for y in range(0, h, line_step):
-            for x in range(0, w, line_step):
-                if data[y][x] < 128:
-                    if dot_radius == 0:
-                        draw.point((x, y), fill='#000000')
-                    else:
-                        draw.ellipse(
-                            [x - dot_radius, y - dot_radius, x + dot_radius, y + dot_radius],
-                            fill='#000000'
-                        )
+        result = Image.new('L', (w, h))
+        result_data = [int(max(0, min(255, data[y][x]))) for y in range(h) for x in range(w)]
+        result.putdata(result_data)
+        return result
     
-    elif mode == "outline":
-        # Marching squares edge detection for accurate preview
-        edges_img = img.filter(ImageFilter.FIND_EDGES)
-        edges_img = edges_img.filter(ImageFilter.SMOOTH)
-        edges_px = edges_img.load()
+    def _find_contours_marching_squares(self, img, threshold):
+        """Find contour edges using marching squares algorithm."""
+        w, h = img.size
+        px = img.load()
+        edges = []
         
-        # Draw thin BLACK contour lines
-        for y in range(h):
-            for x in range(w):
-                if edges_px[x, y] > 40:
-                    draw.point((x, y), fill='#000000')
-    
-    else:  # threshold mode
-        # Draw thin BLACK horizontal scan lines exactly as DXF will have them
-        for y in range(0, h, line_step):
-            x = 0
-            while x < w:
-                # Find start of black region
-                while x < w and px[x, y] >= threshold:
-                    x += 1
-                if x >= w:
-                    break
-                x1 = x
-                # Find end of black region
-                while x < w and px[x, y] < threshold:
-                    x += 1
-                x2 = x
-                # Draw thin BLACK line segment (width=1)
-                if x2 > x1:
-                    draw.line([(x1, y), (x2, y)], fill='#000000', width=1)
-    
-    return preview
-
-
-# ============== MAIN APP ==============
-
-# Hero header
-st.markdown("""
-<div class="hero-container">
-    <div class="hero-title">☕ Image to DXF</div>
-    <div class="hero-subtitle">Transform your images into precision laser-ready DXF files</div>
-</div>
-""", unsafe_allow_html=True)
-
-# Main layout: Settings on left, Images on right
-col_settings, col_images = st.columns([1, 2], gap="large")
-
-with col_settings:
-    # Upload section
-    st.markdown('<div class="section-title">📁 Upload Image</div>', unsafe_allow_html=True)
-    
-    uploaded_file = st.file_uploader(
-        "Drag & drop or click to browse",
-        type=["png", "jpg", "jpeg", "bmp", "gif", "tiff"],
-        help="Supported formats: PNG, JPG, BMP, GIF, TIFF"
-    )
-    
-    if uploaded_file:
-        image = Image.open(uploaded_file)
-        st.markdown(f'<div style="color: #e8b478; font-size: 0.85rem;">✓ Loaded: {image.size[0]} × {image.size[1]} px</div>', unsafe_allow_html=True)
-    
-    st.markdown("<hr style='margin: 1rem 0;'>", unsafe_allow_html=True)
-    
-    # Settings section
-    st.markdown('<div class="section-title">⚙️ Settings</div>', unsafe_allow_html=True)
-    
-    # Radio buttons for conversion mode (all 3 visible)
-    mode = st.radio(
-        "Conversion Mode",
-        options=["threshold", "floyd_steinberg", "outline"],
-        format_func=lambda x: {
-            "threshold": "🔲 Threshold (Lines)",
-            "floyd_steinberg": "⚫ Dithering (Dots)",
-            "outline": "✏️ Outline (Contours)"
-        }[x],
-        horizontal=False
-    )
-    
-    st.markdown('<div class="section-title" style="margin-top: 1rem;">📐 Dimensions</div>', unsafe_allow_html=True)
-    
-    # Unit explanation
-    st.markdown("""
-    <div class="unit-info">
-        💡 <strong>Drawing Units</strong> are scalable — enter values as µm, mm, inches, or any unit.
-    </div>
-    """, unsafe_allow_html=True)
-    
-    output_height = st.number_input(
-        "Output Height",
-        min_value=1.0,
-        max_value=1000000.0,
-        value=1000.0,
-        step=100.0,
-        help="Height in your chosen drawing units"
-    )
-    
-    spot_size = st.number_input(
-        "Tool / Laser Spot Size",
-        min_value=0.1,
-        max_value=1000.0,
-        value=5.0,
-        step=1.0,
-        help="Tool or laser spot size in same units"
-    )
-    
-    # Mode-specific settings
-    if mode == "threshold":
-        threshold = st.slider("Threshold", 0, 255, 200, help="Pixels darker than this become marks")
-        brightness = 1.0
-        contrast = 1.0
-    elif mode == "floyd_steinberg":
-        threshold = 200
-        st.markdown('<div style="color: #e8d5b5; font-size: 0.9rem; margin-top: 0.5rem;">Image Adjustments</div>', unsafe_allow_html=True)
-        brightness = st.slider("Brightness", 0.2, 2.0, 1.0, 0.1, help="Adjust image brightness before dithering")
-        contrast = st.slider("Contrast", 0.2, 2.0, 1.0, 0.1, help="Adjust image contrast before dithering")
-    else:
-        threshold = 200
-        brightness = 1.0
-        contrast = 1.0
-    
-    if mode == "outline":
-        outline_levels = st.slider("Contour Levels", 2, 16, 2)
-        smoothing = st.slider("Smoothing", 0.0, 10.0, 2.0)
-    else:
-        outline_levels = 2
-        smoothing = 2.0
-    
-    # Options
-    st.markdown('<div style="color: #e8d5b5; font-size: 0.9rem; margin-top: 0.5rem;">Options</div>', unsafe_allow_html=True)
-    col_o1, col_o2 = st.columns(2)
-    with col_o1:
-        invert = st.checkbox("Invert", value=False)
-        flip_y = st.checkbox("Flip Y", value=True)
-    with col_o2:
-        bidirectional = st.checkbox("Bidirectional", value=True)
-
-with col_images:
-    if uploaded_file:
-        # Calculate parameters for preview
-        w, h = image.size
-        aspect_ratio = w / h
-        output_width = output_height * aspect_ratio
-        pixel_size_y = output_height / h
-        min_spacing = spot_size * 1.1
-        line_step = max(1, int(math.ceil(min_spacing / pixel_size_y)))
-        
-        # Two images side by side
-        col_orig, col_preview = st.columns(2, gap="small")
-        
-        with col_orig:
-            st.markdown('<div class="image-container">', unsafe_allow_html=True)
-            st.markdown('<div class="image-label">Original Image</div>', unsafe_allow_html=True)
-            st.image(image, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        with col_preview:
-            st.markdown('<div class="image-container" style="background: #ffffff;">', unsafe_allow_html=True)
-            st.markdown('<div class="image-label" style="color: #1a1a2e;">DXF Preview</div>', unsafe_allow_html=True)
-            preview_img = generate_preview(image, mode, threshold, invert, line_step, brightness, contrast)
-            st.image(preview_img, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Stats below both images
-        st.markdown(f"""
-        <div class="stats-grid">
-            <div class="stat-box">
-                <div class="stat-value">{output_width:.0f}</div>
-                <div class="stat-label">Width</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-value">{output_height:.0f}</div>
-                <div class="stat-label">Height</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-value">{line_step}</div>
-                <div class="stat-label">Step</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-value">{h // line_step}</div>
-                <div class="stat-label">Lines</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Example images section
-        st.markdown("""
-        <div style="margin-top: 1.5rem;">
-            <div class="section-title" style="font-size: 1rem;">📋 Complexity Examples</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        col_ex1, col_ex2, col_ex3 = st.columns(3)
-        
-        # Load example images safely - won't crash if files are missing
-        import os
-        example_path = os.path.join(os.path.dirname(__file__), "examples")
-        
-        with col_ex1:
-            st.markdown('<div style="text-align: center; color: #e8b478; font-size: 0.8rem; margin-bottom: 0.3rem;">🥤 Simple (Outline)</div>', unsafe_allow_html=True)
-            simple_path = os.path.join(example_path, "simple_outline.png")
-            if os.path.exists(simple_path):
-                st.image(simple_path, use_container_width=True)
-            else:
-                st.markdown('<div style="background: #2a2a3e; padding: 2rem; text-align: center; border-radius: 8px; color: #666;">Example image</div>', unsafe_allow_html=True)
-        
-        with col_ex2:
-            st.markdown('<div style="text-align: center; color: #e8b478; font-size: 0.8rem; margin-bottom: 0.3rem;">☕ Medium (Threshold)</div>', unsafe_allow_html=True)
-            medium_path = os.path.join(example_path, "medium_threshold.png")
-            if os.path.exists(medium_path):
-                st.image(medium_path, use_container_width=True)
-            else:
-                st.markdown('<div style="background: #2a2a3e; padding: 2rem; text-align: center; border-radius: 8px; color: #666;">Example image</div>', unsafe_allow_html=True)
-        
-        with col_ex3:
-            st.markdown('<div style="text-align: center; color: #e8b478; font-size: 0.8rem; margin-bottom: 0.3rem;">✨ Complex (Dithering)</div>', unsafe_allow_html=True)
-            complex_path = os.path.join(example_path, "complex_dithering.png")
-            if os.path.exists(complex_path):
-                st.image(complex_path, use_container_width=True)
-            else:
-                st.markdown('<div style="background: #2a2a3e; padding: 2rem; text-align: center; border-radius: 8px; color: #666;">Example image</div>', unsafe_allow_html=True)
-    else:
-        # Placeholder when no image
-        st.markdown("""
-        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-            <div class="image-container" style="flex: 1; min-height: 250px; display: flex; align-items: center; justify-content: center;">
-                <div style="text-align: center; color: #606070;">
-                    <div style="font-size: 2rem;">🖼️</div>
-                    <div style="font-size: 0.85rem;">Original</div>
-                </div>
-            </div>
-            <div class="image-container" style="flex: 1; min-height: 250px; display: flex; align-items: center; justify-content: center; background: #f5f5f5;">
-                <div style="text-align: center; color: #909090;">
-                    <div style="font-size: 2rem;">👁️</div>
-                    <div style="font-size: 0.85rem;">Preview</div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-# Only show payment and convert sections if image is uploaded
-if uploaded_file:
-    st.markdown("<hr>", unsafe_allow_html=True)
-    
-    # Payment section - more compact
-    st.markdown("""
-    <div style="text-align: center; margin-bottom: 1rem;">
-        <div class="section-title" style="justify-content: center; font-size: 1.3rem;">☕ Support the Developer</div>
-        <p style="color: #a0a0b0; font-size: 0.9rem; margin: 0;">Choose a coffee based on your image complexity</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="coffee-grid">
-        <div class="coffee-card">
-            <div class="coffee-icon">🥤</div>
-            <div class="coffee-name">Diner Coffee</div>
-            <div class="coffee-price">$2.50</div>
-            <div class="coffee-desc">Simple graphics & shapes</div>
-        </div>
-        <div class="coffee-card">
-            <div class="coffee-icon">☕</div>
-            <div class="coffee-name">Cappuccino</div>
-            <div class="coffee-price">$5.00</div>
-            <div class="coffee-desc">Average complexity</div>
-        </div>
-        <div class="coffee-card">
-            <div class="coffee-icon">✨</div>
-            <div class="coffee-name">Specialty Espresso</div>
-            <div class="coffee-price">$6.50</div>
-            <div class="coffee-desc">Complex & detailed</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col_p1, col_p2, col_p3 = st.columns(3)
-    with col_p1:
-        st.link_button("Buy Diner Coffee", PAYMENT_LINKS["deli_coffee"], use_container_width=True)
-    with col_p2:
-        st.link_button("Buy Cappuccino", PAYMENT_LINKS["cappuccino"], use_container_width=True)
-    with col_p3:
-        st.link_button("Buy Specialty", PAYMENT_LINKS["specialty_espresso"], use_container_width=True)
-    
-    st.markdown("<hr>", unsafe_allow_html=True)
-    
-    # Convert section
-    col_c1, col_c2, col_c3 = st.columns([1, 2, 1])
-    with col_c2:
-        convert_clicked = st.button("⚡ Convert to DXF", type="primary", use_container_width=True)
-    
-    if convert_clicked:
-        with st.spinner("Converting..."):
-            try:
-                uploaded_file.seek(0)
+        for y in range(h - 1):
+            for x in range(w - 1):
+                tl = 1 if px[x, y] >= threshold else 0
+                tr = 1 if px[x + 1, y] >= threshold else 0
+                br = 1 if px[x + 1, y + 1] >= threshold else 0
+                bl = 1 if px[x, y + 1] >= threshold else 0
                 
-                # For dithering mode, apply brightness/contrast to image before conversion
-                if mode == "floyd_steinberg" and (brightness != 1.0 or contrast != 1.0):
-                    img_for_conversion = image.copy().convert('L')
-                    if brightness != 1.0:
-                        enhancer = ImageEnhance.Brightness(img_for_conversion)
-                        img_for_conversion = enhancer.enhance(brightness)
-                    if contrast != 1.0:
-                        enhancer = ImageEnhance.Contrast(img_for_conversion)
-                        img_for_conversion = enhancer.enhance(contrast)
-                    image_input = img_for_conversion
+                cell = tl * 8 + tr * 4 + br * 2 + bl * 1
+                
+                if cell == 0 or cell == 15:
+                    continue
+                
+                top = (x + 0.5, y)
+                right = (x + 1, y + 0.5)
+                bottom = (x + 0.5, y + 1)
+                left = (x, y + 0.5)
+                
+                if cell == 1 or cell == 14:
+                    edges.append((left, bottom))
+                elif cell == 2 or cell == 13:
+                    edges.append((bottom, right))
+                elif cell == 3 or cell == 12:
+                    edges.append((left, right))
+                elif cell == 4 or cell == 11:
+                    edges.append((top, right))
+                elif cell == 5:
+                    edges.append((left, top))
+                    edges.append((bottom, right))
+                elif cell == 6 or cell == 9:
+                    edges.append((top, bottom))
+                elif cell == 7 or cell == 8:
+                    edges.append((left, top))
+                elif cell == 10:
+                    edges.append((top, right))
+                    edges.append((left, bottom))
+        
+        return edges
+    
+    def _trace_contours(self, edges):
+        """Connect edge segments into continuous polylines."""
+        if not edges:
+            return []
+        
+        adjacency = {}
+        for (p1, p2) in edges:
+            if p1 not in adjacency:
+                adjacency[p1] = []
+            if p2 not in adjacency:
+                adjacency[p2] = []
+            adjacency[p1].append(p2)
+            adjacency[p2].append(p1)
+        
+        used_edges = set()
+        polylines = []
+        
+        def edge_key(p1, p2):
+            return tuple(sorted([p1, p2]))
+        
+        for start_point in adjacency:
+            for next_point in adjacency[start_point]:
+                ek = edge_key(start_point, next_point)
+                if ek in used_edges:
+                    continue
+                
+                polyline = [start_point, next_point]
+                used_edges.add(ek)
+                
+                current = next_point
+                while True:
+                    found_next = False
+                    for neighbor in adjacency.get(current, []):
+                        ek = edge_key(current, neighbor)
+                        if ek not in used_edges:
+                            used_edges.add(ek)
+                            polyline.append(neighbor)
+                            current = neighbor
+                            found_next = True
+                            break
+                    if not found_next:
+                        break
+                
+                current = start_point
+                while True:
+                    found_next = False
+                    for neighbor in adjacency.get(current, []):
+                        ek = edge_key(current, neighbor)
+                        if ek not in used_edges:
+                            used_edges.add(ek)
+                            polyline.insert(0, neighbor)
+                            current = neighbor
+                            found_next = True
+                            break
+                    if not found_next:
+                        break
+                
+                if len(polyline) >= 2:
+                    polylines.append(polyline)
+        
+        return polylines
+    
+    def _simplify_polyline(self, points, tolerance):
+        """Douglas-Peucker polyline simplification."""
+        if len(points) <= 2:
+            return points
+        
+        is_closed = (points[0] == points[-1])
+        
+        if is_closed and len(points) <= 4:
+            return points
+        
+        if is_closed:
+            max_dist = 0
+            split_idx = 1
+            
+            for i in range(1, len(points) - 1):
+                prev_pt = points[i - 1]
+                next_pt = points[(i + 1) % (len(points) - 1)]
+                dist = self._point_line_distance(points[i], prev_pt, next_pt)
+                if dist > max_dist:
+                    max_dist = dist
+                    split_idx = i
+            
+            reordered = points[split_idx:-1] + points[:split_idx + 1]
+            simplified = self._simplify_open(reordered, tolerance)
+            
+            if simplified[0] != simplified[-1]:
+                simplified.append(simplified[0])
+            
+            return simplified
+        else:
+            return self._simplify_open(points, tolerance)
+    
+    def _simplify_open(self, points, tolerance):
+        """Douglas-Peucker simplification for open polylines."""
+        if len(points) <= 2:
+            return points
+        
+        first = points[0]
+        last = points[-1]
+        
+        max_dist = 0
+        max_idx = 0
+        
+        for i in range(1, len(points) - 1):
+            dist = self._point_line_distance(points[i], first, last)
+            if dist > max_dist:
+                max_dist = dist
+                max_idx = i
+        
+        if max_dist > tolerance:
+            left = self._simplify_open(points[:max_idx + 1], tolerance)
+            right = self._simplify_open(points[max_idx:], tolerance)
+            return left[:-1] + right
+        else:
+            return [first, last]
+    
+    def _point_line_distance(self, point, line_start, line_end):
+        """Calculate perpendicular distance from point to line segment."""
+        x, y = point
+        x1, y1 = line_start
+        x2, y2 = line_end
+        
+        dx = x2 - x1
+        dy = y2 - y1
+        
+        if dx == 0 and dy == 0:
+            return math.sqrt((x - x1)**2 + (y - y1)**2)
+        
+        t = max(0, min(1, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy)))
+        
+        proj_x = x1 + t * dx
+        proj_y = y1 + t * dy
+        
+        return math.sqrt((x - proj_x)**2 + (y - proj_y)**2)
+    
+    def _calculate_angle(self, p1, p2, p3):
+        """Calculate the angle at p2 formed by p1-p2-p3."""
+        v1 = (p1[0] - p2[0], p1[1] - p2[1])
+        v2 = (p3[0] - p2[0], p3[1] - p2[1])
+        
+        len1 = math.sqrt(v1[0]**2 + v1[1]**2)
+        len2 = math.sqrt(v2[0]**2 + v2[1]**2)
+        
+        if len1 == 0 or len2 == 0:
+            return 180.0
+        
+        dot = v1[0]*v2[0] + v1[1]*v2[1]
+        cos_angle = max(-1, min(1, dot / (len1 * len2)))
+        
+        return math.degrees(math.acos(cos_angle))
+    
+    def _detect_corners(self, points, angle_threshold):
+        """Find indices of corner points."""
+        if len(points) < 3:
+            return []
+        
+        corners = []
+        is_closed = (points[0] == points[-1])
+        n = len(points) - 1 if is_closed else len(points)
+        
+        for i in range(1, n):
+            if is_closed:
+                p1 = points[(i - 1) % n]
+                p2 = points[i % n]
+                p3 = points[(i + 1) % n]
+            else:
+                if i == 0 or i == len(points) - 1:
+                    continue
+                p1 = points[i - 1]
+                p2 = points[i]
+                p3 = points[i + 1]
+            
+            angle = self._calculate_angle(p1, p2, p3)
+            
+            if angle < angle_threshold:
+                corners.append(i)
+        
+        return corners
+    
+    def _gaussian_weight(self, distance, sigma):
+        """Calculate Gaussian weight."""
+        if sigma <= 0:
+            return 1.0 if distance == 0 else 0.0
+        return math.exp(-(distance**2) / (2 * sigma**2))
+    
+    def _smooth_segment(self, points, sigma):
+        """Apply Gaussian smoothing to a segment."""
+        if len(points) <= 2 or sigma <= 0:
+            return points
+        
+        smoothed = []
+        window = int(sigma * 3)
+        
+        for i in range(len(points)):
+            sum_x = 0
+            sum_y = 0
+            sum_weight = 0
+            
+            for j in range(max(0, i - window), min(len(points), i + window + 1)):
+                weight = self._gaussian_weight(abs(j - i), sigma)
+                sum_x += points[j][0] * weight
+                sum_y += points[j][1] * weight
+                sum_weight += weight
+            
+            if sum_weight > 0:
+                smoothed.append((sum_x / sum_weight, sum_y / sum_weight))
+            else:
+                smoothed.append(points[i])
+        
+        return smoothed
+    
+    def _smooth_contour(self, points, smoothing_pixels, corner_angle_threshold):
+        """Smooth a contour while preserving sharp corners."""
+        if len(points) < 3 or smoothing_pixels <= 0:
+            return points
+        
+        is_closed = (points[0] == points[-1])
+        corners = self._detect_corners(points, corner_angle_threshold)
+        
+        if not corners:
+            if is_closed:
+                extended = points[:-1] + points[:-1] + points[:-1]
+                n = len(points) - 1
+                smoothed_ext = self._smooth_segment(extended, smoothing_pixels)
+                smoothed = smoothed_ext[n:2*n]
+                smoothed.append(smoothed[0])
+                return smoothed
+            else:
+                return self._smooth_segment(points, smoothing_pixels)
+        
+        if is_closed:
+            all_corners = sorted(set(corners))
+        else:
+            all_corners = sorted(set([0] + corners + [len(points) - 1]))
+        
+        smoothed_points = []
+        
+        if is_closed:
+            n_corners = len(all_corners)
+            for i in range(n_corners):
+                start_idx = all_corners[i]
+                end_idx = all_corners[(i + 1) % n_corners]
+                
+                if end_idx > start_idx:
+                    segment = points[start_idx:end_idx + 1]
                 else:
-                    uploaded_file.seek(0)
-                    image_input = uploaded_file.read()
+                    segment = points[start_idx:-1] + points[:end_idx + 1]
                 
-                dxf_content, stats = converter.convert(
-                    input_image=image_input,
-                    mode=mode,
-                    image_height_um=output_height,
-                    spot_size_um=spot_size,
-                    spot_spacing_factor=1.1,
-                    threshold=threshold,
-                    invert=invert,
-                    flip_y=flip_y,
-                    bidirectional=bidirectional,
-                    outline_levels=outline_levels,
-                    smoothing_amount=smoothing,
-                    corner_threshold=45.0
-                )
+                if len(segment) > 2:
+                    middle = self._smooth_segment(segment, smoothing_pixels)
+                    middle[0] = segment[0]
+                    middle[-1] = segment[-1]
+                    smoothed_points.extend(middle[:-1])
+                else:
+                    smoothed_points.extend(segment[:-1])
+            
+            smoothed_points.append(smoothed_points[0])
+        else:
+            for i in range(len(all_corners) - 1):
+                start_idx = all_corners[i]
+                end_idx = all_corners[i + 1]
                 
-                st.session_state['dxf_content'] = dxf_content
-                st.session_state['stats'] = stats
-                st.session_state['filename'] = uploaded_file.name.rsplit('.', 1)[0] + '.dxf'
+                segment = points[start_idx:end_idx + 1]
                 
-                st.success("✅ Conversion complete!")
-                
-            except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
+                if len(segment) > 2:
+                    middle = self._smooth_segment(segment, smoothing_pixels)
+                    middle[0] = segment[0]
+                    middle[-1] = segment[-1]
+                    
+                    if i == 0:
+                        smoothed_points.extend(middle)
+                    else:
+                        smoothed_points.extend(middle[1:])
+                else:
+                    if i == 0:
+                        smoothed_points.extend(segment)
+                    else:
+                        smoothed_points.extend(segment[1:])
+        
+        return smoothed_points
     
-    # Download section
-    if 'dxf_content' in st.session_state:
-        stats = st.session_state['stats']
+    def _optimize_outline_path(self, polylines, connection_tolerance=2.0):
+        """Optimize outline path for continuous laser travel."""
+        if not polylines or len(polylines) <= 1:
+            return polylines
         
-        col_r1, col_r2 = st.columns([2, 1])
+        def distance(p1, p2):
+            return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
         
-        with col_r1:
-            st.markdown(f"""
-            <div class="stats-grid">
-                <div class="stat-box">
-                    <div class="stat-value">{stats['entity_count']:,}</div>
-                    <div class="stat-label">Entities</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value">{stats['width_um']:.0f}</div>
-                    <div class="stat-label">Width</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value">{stats['height_um']:.0f}</div>
-                    <div class="stat-label">Height</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value">{stats['file_size_kb']:.1f} KB</div>
-                    <div class="stat-label">File Size</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+        def get_endpoints(poly):
+            return poly[0], poly[-1]
         
-        with col_r2:
-            st.download_button(
-                label="⬇️ Download DXF",
-                data=st.session_state['dxf_content'],
-                file_name=st.session_state['filename'],
-                mime="application/dxf",
-                use_container_width=True
-            )
-
-# Footer
-st.markdown("""
-<div class="footer">
-    <div class="footer-text">
-        Image to DXF Converter • Built with ❤️ for makers<br>
-        <span style="font-size: 0.75rem;">Precision tools for laser cutting & CNC</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+        n = len(polylines)
+        endpoints = [get_endpoints(p) for p in polylines]
+        
+        connections = [[] for _ in range(n)]
+        
+        for i in range(n):
+            start_i, end_i = endpoints[i]
+            for j in range(n):
+                if i == j:
+                    continue
+                start_j, end_j = endpoints[j]
+                
+                d_ss = distance(start_i, start_j)
+                d_se = distance(start_i, end_j)
+                d_es = distance(end_i, start_j)
+                d_ee = distance(end_i, end_j)
+                
+                if d_ss <= connection_tolerance:
+                    connections[i].append((j, 0, 0, d_ss))
+                if d_se <= connection_tolerance:
+                    connections[i].append((j, 0, 1, d_se))
+                if d_es <= connection_tolerance:
+                    connections[i].append((j, 1, 0, d_es))
+                if d_ee <= connection_tolerance:
+                    connections[i].append((j, 1, 1, d_ee))
+        
+        for i in range(n):
+            connections[i].sort(key=lambda x: x[3])
+        
+        used = [False] * n
+        chains = []
+        
+        def build_chain(start_idx):
+            chain = [(start_idx, False)]
+            used[start_idx] = True
+            
+            while True:
+                last_idx, last_reversed = chain[-1]
+                last_poly = polylines[last_idx]
+                if last_reversed:
+                    current_endpoint = 0
+                else:
+                    current_endpoint = 1
+                
+                best_next = None
+                best_dist = float('inf')
+                best_reverse = False
+                
+                for other_idx, my_ep, their_ep, dist in connections[last_idx]:
+                    if used[other_idx]:
+                        continue
+                    if last_reversed:
+                        my_actual_ep = 1 - my_ep
+                    else:
+                        my_actual_ep = my_ep
+                    
+                    if my_actual_ep == 1:
+                        if dist < best_dist:
+                            best_dist = dist
+                            best_next = other_idx
+                            best_reverse = (their_ep == 1)
+                
+                if best_next is not None:
+                    chain.append((best_next, best_reverse))
+                    used[best_next] = True
+                else:
+                    break
+            
+            while True:
+                first_idx, first_reversed = chain[0]
+                if first_reversed:
+                    current_endpoint = 1
+                else:
+                    current_endpoint = 0
+                
+                best_prev = None
+                best_dist = float('inf')
+                best_reverse = False
+                
+                for other_idx, my_ep, their_ep, dist in connections[first_idx]:
+                    if used[other_idx]:
+                        continue
+                    if first_reversed:
+                        my_actual_ep = 1 - my_ep
+                    else:
+                        my_actual_ep = my_ep
+                    
+                    if my_actual_ep == 0:
+                        if dist < best_dist:
+                            best_dist = dist
+                            best_prev = other_idx
+                            best_reverse = (their_ep == 0)
+                
+                if best_prev is not None:
+                    chain.insert(0, (best_prev, best_reverse))
+                    used[best_prev] = True
+                else:
+                    break
+            
+            return chain
+        
+        for i in range(n):
+            if not used[i]:
+                chain = build_chain(i)
+                chains.append(chain)
+        
+        def chain_endpoints(chain):
+            first_idx, first_rev = chain[0]
+            last_idx, last_rev = chain[-1]
+            
+            first_poly = polylines[first_idx]
+            last_poly = polylines[last_idx]
+            
+            if first_rev:
+                chain_start = first_poly[-1]
+            else:
+                chain_start = first_poly[0]
+            
+            if last_rev:
+                chain_end = last_poly[0]
+            else:
+                chain_end = last_poly[-1]
+            
+            return chain_start, chain_end
+        
+        current_pos = (0, 0)
+        remaining_chains = list(range(len(chains)))
+        ordered_chains = []
+        
+        while remaining_chains:
+            best_chain_idx = None
+            best_dist = float('inf')
+            best_reverse_chain = False
+            
+            for ci in remaining_chains:
+                chain_start, chain_end = chain_endpoints(chains[ci])
+                
+                dist_to_start = distance(current_pos, chain_start)
+                dist_to_end = distance(current_pos, chain_end)
+                
+                if dist_to_start < best_dist:
+                    best_dist = dist_to_start
+                    best_chain_idx = ci
+                    best_reverse_chain = False
+                
+                if dist_to_end < best_dist:
+                    best_dist = dist_to_end
+                    best_chain_idx = ci
+                    best_reverse_chain = True
+            
+            chain = chains[best_chain_idx]
+            if best_reverse_chain:
+                chain = [(idx, not rev) for idx, rev in reversed(chain)]
+            
+            ordered_chains.append(chain)
+            
+            _, chain_end = chain_endpoints(chain)
+            current_pos = chain_end
+            remaining_chains.remove(best_chain_idx)
+        
+        result = []
+        for chain in ordered_chains:
+            for poly_idx, reversed_flag in chain:
+                poly = polylines[poly_idx]
+                if reversed_flag:
+                    poly = list(reversed(poly))
+                result.append(poly)
+        
+        return result
