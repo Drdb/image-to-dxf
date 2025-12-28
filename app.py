@@ -312,6 +312,12 @@ st.markdown("""
         color: #e8d5b5 !important;
     }
     
+    /* Compact sliders and inputs */
+    .stSlider, .stNumberInput {
+        margin-bottom: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    
     /* Info boxes */
     .stAlert {
         background: rgba(232,180,120,0.1) !important;
@@ -519,32 +525,26 @@ with col_images:
         
         # Define controls FIRST (to get values) but in the second container
         with controls_container:
-            st.markdown('<div class="section-title" style="margin-top: 1rem; margin-bottom: 0.5rem;">🎨 Image Adjustments</div>', unsafe_allow_html=True)
+            # Ultra-compact controls - all in 2 rows
+            # Row 1: Height, Spot Size, Threshold
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                output_height = st.number_input("Height", min_value=1.0, max_value=1000000.0, value=1000.0, step=100.0)
+            with c2:
+                spot_size = st.number_input("Spot Size", min_value=0.1, max_value=1000.0, value=5.0, step=1.0)
+            with c3:
+                threshold = st.slider("Threshold", 0, 255, 200)
             
-            # Dimensions - Output Height and Spot Size
-            st.markdown('<div style="color: #e8d5b5; font-size: 0.85rem; margin-bottom: 0.25rem;">📐 Dimensions (scalable units: µm, mm, inches, etc.)</div>', unsafe_allow_html=True)
-            col_h, col_s = st.columns(2)
-            with col_h:
-                output_height = st.number_input("Output Height", min_value=1.0, max_value=1000000.0, value=1000.0, step=100.0)
-            with col_s:
-                spot_size = st.number_input("Tool / Spot Size", min_value=0.1, max_value=1000.0, value=5.0, step=1.0)
-            
-            # Threshold slider - available for all modes
-            threshold = st.slider("Threshold", 0, 255, 200, help="Pixels darker than this become marks")
-            
-            # Brightness and Contrast - available for all modes
-            col_b, col_c = st.columns(2)
-            with col_b:
-                brightness = st.slider("Brightness", 0.2, 2.0, 1.0, 0.1, help="Adjust image brightness")
-            with col_c:
-                contrast = st.slider("Contrast", 0.2, 2.0, 1.0, 0.1, help="Adjust image contrast")
-            
-            # Contour Levels and Smoothing - available for all modes
-            col_ol, col_sm = st.columns(2)
-            with col_ol:
-                outline_levels = st.slider("Contour Levels", 2, 16, 2)
-            with col_sm:
-                smoothing = st.slider("Smoothing", 0.0, 10.0, 2.0)
+            # Row 2: Brightness, Contrast, Contours, Smoothing
+            c4, c5, c6, c7 = st.columns(4)
+            with c4:
+                brightness = st.slider("Bright", 0.2, 2.0, 1.0, 0.1)
+            with c5:
+                contrast = st.slider("Contrast", 0.2, 2.0, 1.0, 0.1)
+            with c6:
+                outline_levels = st.slider("Contours", 2, 16, 2)
+            with c7:
+                smoothing = st.slider("Smooth", 0.0, 10.0, 2.0)
         
         # Calculate parameters for preview
         w, h = image.size
@@ -572,27 +572,8 @@ with col_images:
                 st.image(preview_img, use_container_width=True)
                 st.markdown('</div>', unsafe_allow_html=True)
             
-            # Stats below both images
-            st.markdown(f"""
-            <div class="stats-grid">
-                <div class="stat-box">
-                    <div class="stat-value">{output_width:.0f}</div>
-                    <div class="stat-label">Width</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value">{output_height:.0f}</div>
-                    <div class="stat-label">Height</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value">{line_step}</div>
-                    <div class="stat-label">Step</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value">{h // line_step}</div>
-                    <div class="stat-label">Lines</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            # Compact stats - single line
+            st.markdown(f'<div style="text-align: center; color: #a0a0b0; font-size: 0.8rem; margin: 0.25rem 0;">Output: {output_width:.0f} × {output_height:.0f} | Step: {line_step} | Lines: {h // line_step}</div>', unsafe_allow_html=True)
     else:
         # Defaults when no image uploaded
         output_height = 1000.0
