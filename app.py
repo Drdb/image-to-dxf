@@ -366,7 +366,7 @@ PAYMENT_LINKS = {
 converter = BitmapToDXFConverter()
 
 
-def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, contrast=1.0, outline_levels=2, smoothing=2.0):
+def generate_preview(image, mode, threshold, invert, flip_y, line_step, brightness=1.0, contrast=1.0, outline_levels=2, smoothing=2.0):
     """Generate a high-fidelity preview of the DXF output - black on white like CAD software."""
     img = image.copy().convert('L')
     w, h = img.size
@@ -386,6 +386,10 @@ def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, 
     # Apply inversion to source if needed
     if invert:
         img = ImageOps.invert(img)
+    
+    # Apply flip Y if needed
+    if flip_y:
+        img = ImageOps.flip(img)
     
     px = img.load()
     
@@ -591,7 +595,7 @@ with col_images:
             with col_preview:
                 st.markdown('<div class="image-container" style="background: #ffffff;">', unsafe_allow_html=True)
                 st.markdown('<div class="image-label" style="color: #1a1a2e;">DXF Preview</div>', unsafe_allow_html=True)
-                preview_img = generate_preview(image, mode, threshold, invert, line_step, brightness, contrast, outline_levels, smoothing)
+                preview_img = generate_preview(image, mode, threshold, invert, flip_y, line_step, brightness, contrast, outline_levels, smoothing)
                 st.image(preview_img, use_container_width=True)
                 st.markdown('</div>', unsafe_allow_html=True)
             
