@@ -366,19 +366,18 @@ PAYMENT_LINKS = {
 converter = BitmapToDXFConverter()
 
 
-def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, contrast=1.0):
+def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, contrast=1.0, outline_levels=2, smoothing=2.0):
     """Generate a high-fidelity preview of the DXF output - black on white like CAD software."""
     img = image.copy().convert('L')
     w, h = img.size
     
-    # Apply brightness and contrast adjustments for dithering mode
-    if mode == "floyd_steinberg":
-        if brightness != 1.0:
-            enhancer = ImageEnhance.Brightness(img)
-            img = enhancer.enhance(brightness)
-        if contrast != 1.0:
-            enhancer = ImageEnhance.Contrast(img)
-            img = enhancer.enhance(contrast)
+    # Apply brightness and contrast adjustments for ALL modes
+    if brightness != 1.0:
+        enhancer = ImageEnhance.Brightness(img)
+        img = enhancer.enhance(brightness)
+    if contrast != 1.0:
+        enhancer = ImageEnhance.Contrast(img)
+        img = enhancer.enhance(contrast)
     
     # Create preview image - WHITE background, BLACK lines (like CAD software)
     preview = Image.new('RGB', (w, h), '#ffffff')
@@ -425,15 +424,39 @@ def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, 
                         )
     
     elif mode == "outline":
-        # Marching squares edge detection for accurate preview
-        edges_img = img.filter(ImageFilter.FIND_EDGES)
-        edges_img = edges_img.filter(ImageFilter.SMOOTH)
-        edges_px = edges_img.load()
+        # Apply smoothing based on parameter
+        if smoothing > 0:
+            from PIL import ImageFilter
+            # Apply Gaussian blur proportional to smoothing value
+            blur_radius = smoothing / 2.0
+            img = img.filter(ImageFilter.GaussianBlur(radius=blur_radius))
         
-        # Draw thin BLACK contour lines
+        # Multi-level contour detection based on outline_levels
+        # Create multiple threshold levels across the grayscale range
+        edges_img = Image.new('L', (w, h), 255)
+        edges_px = edges_img.load()
+        img_px = img.load()
+        
+        # Generate contour lines at different gray levels
+        for level in range(outline_levels):
+            # Distribute thresholds across the grayscale range
+            level_threshold = int(255 * (level + 1) / (outline_levels + 1))
+            
+            # Detect edges at this threshold level
+            for y in range(1, h - 1):
+                for x in range(1, w - 1):
+                    # Check if this pixel crosses the threshold compared to neighbors
+                    center = img_px[x, y]
+                    if ((center < level_threshold and img_px[x+1, y] >= level_threshold) or
+                        (center >= level_threshold and img_px[x+1, y] < level_threshold) or
+                        (center < level_threshold and img_px[x, y+1] >= level_threshold) or
+                        (center >= level_threshold and img_px[x, y+1] < level_threshold)):
+                        edges_px[x, y] = 0
+        
+        # Draw the contour lines
         for y in range(h):
             for x in range(w):
-                if edges_px[x, y] > 40:
+                if edges_px[x, y] == 0:
                     draw.point((x, y), fill='#000000')
     
     else:  # threshold mode
@@ -568,7 +591,7 @@ with col_images:
             with col_preview:
                 st.markdown('<div class="image-container" style="background: #ffffff;">', unsafe_allow_html=True)
                 st.markdown('<div class="image-label" style="color: #1a1a2e;">DXF Preview</div>', unsafe_allow_html=True)
-                preview_img = generate_preview(image, mode, threshold, invert, line_step, brightness, contrast)
+                preview_img = generate_preview(image, mode, threshold, invert, line_step, brightness, contrast, outline_levels, smoothing)
                 st.image(preview_img, use_container_width=True)
                 st.markdown('</div>', unsafe_allow_html=True)
             
