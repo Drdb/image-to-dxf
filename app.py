@@ -388,9 +388,8 @@ def generate_preview(image, mode, threshold, invert, flip_y, line_step, brightne
         img = ImageOps.invert(img)
     
     # Apply flip Y if needed
-    # Note: flip_y=True means DXF will be upright in CAD (Y=0 at bottom)
-    # Preview should match CAD view, so we flip when flip_y is FALSE
-    if not flip_y:
+    # flip_y=False (default) shows upright, flip_y=True flips the image
+    if flip_y:
         img = ImageOps.flip(img)
     
     px = img.load()
@@ -541,7 +540,7 @@ with col_settings:
     col_o1, col_o2 = st.columns(2)
     with col_o1:
         invert = st.checkbox("Invert", value=False)
-        flip_y = st.checkbox("Flip Y", value=True)
+        flip_y = st.checkbox("Flip Y", value=False)
     with col_o2:
         bidirectional = st.checkbox("Bidirectional", value=True)
 
