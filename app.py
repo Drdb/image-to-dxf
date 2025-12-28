@@ -457,7 +457,7 @@ def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, 
 # Hero header
 st.markdown("""
 <div class="hero-container">
-    <div class="hero-title">☕ Bitmap To DXF</div>
+    <div class="hero-title">Bitmap To DXF</div>
     <div class="hero-subtitle">Transform your images into precision fabrication-ready DXF files</div>
 </div>
 """, unsafe_allow_html=True)
@@ -496,41 +496,10 @@ with col_settings:
         horizontal=False
     )
     
-    st.markdown('<div class="section-title" style="margin-top: 1rem;">📐 Dimensions</div>', unsafe_allow_html=True)
     
-    # Unit explanation
-    st.markdown("""
-    <div class="unit-info">
-        💡 <strong>Drawing Units</strong> are scalable — enter values as µm, mm, inches, or any unit.
-    </div>
-    """, unsafe_allow_html=True)
-    
-    output_height = st.number_input(
-        "Output Height",
-        min_value=1.0,
-        max_value=1000000.0,
-        value=1000.0,
-        step=100.0,
-        help="Height in your chosen drawing units"
-    )
-    
-    spot_size = st.number_input(
-        "Tool / Laser Spot Size",
-        min_value=0.1,
-        max_value=1000.0,
-        value=5.0,
-        step=1.0,
-        help="Tool or laser spot size in same units"
-    )
-    
-    # Mode-specific defaults (sliders moved under images)
-    # Outline-specific settings stay here since they don't need preview
-    if mode == "outline":
-        outline_levels = st.slider("Contour Levels", 2, 16, 2)
-        smoothing = st.slider("Smoothing", 0.0, 10.0, 2.0)
-    else:
-        outline_levels = 2
-        smoothing = 2.0
+    # Defaults - actual controls moved to Image Adjustments section
+    outline_levels = 2
+    smoothing = 2.0
     
     # Options
     st.markdown('<div style="color: #e8d5b5; font-size: 0.9rem; margin-top: 0.5rem;">Options</div>', unsafe_allow_html=True)
@@ -546,21 +515,30 @@ with col_images:
         # Image adjustment controls - right above the preview for easy adjustment
         st.markdown('<div class="section-title" style="margin-bottom: 0.5rem;">🎨 Image Adjustments</div>', unsafe_allow_html=True)
         
-        if mode == "threshold":
-            threshold = st.slider("Threshold", 0, 255, 200, help="Pixels darker than this become marks")
-            brightness = 1.0
-            contrast = 1.0
-        elif mode == "floyd_steinberg":
-            threshold = 200
-            col_b, col_c = st.columns(2)
-            with col_b:
-                brightness = st.slider("Brightness", 0.2, 2.0, 1.0, 0.1, help="Adjust brightness")
-            with col_c:
-                contrast = st.slider("Contrast", 0.2, 2.0, 1.0, 0.1, help="Adjust contrast")
-        else:
-            threshold = 200
-            brightness = 1.0
-            contrast = 1.0
+        # Dimensions - Output Height and Spot Size
+        st.markdown('<div style="color: #e8d5b5; font-size: 0.85rem; margin-bottom: 0.25rem;">📐 Dimensions (scalable units: µm, mm, inches, etc.)</div>', unsafe_allow_html=True)
+        col_h, col_s = st.columns(2)
+        with col_h:
+            output_height = st.number_input("Output Height", min_value=1.0, max_value=1000000.0, value=1000.0, step=100.0)
+        with col_s:
+            spot_size = st.number_input("Tool / Spot Size", min_value=0.1, max_value=1000.0, value=5.0, step=1.0)
+        
+        # Threshold slider - available for all modes
+        threshold = st.slider("Threshold", 0, 255, 200, help="Pixels darker than this become marks")
+        
+        # Brightness and Contrast - available for all modes
+        col_b, col_c = st.columns(2)
+        with col_b:
+            brightness = st.slider("Brightness", 0.2, 2.0, 1.0, 0.1, help="Adjust image brightness")
+        with col_c:
+            contrast = st.slider("Contrast", 0.2, 2.0, 1.0, 0.1, help="Adjust image contrast")
+        
+        # Contour Levels and Smoothing - available for all modes
+        col_ol, col_sm = st.columns(2)
+        with col_ol:
+            outline_levels = st.slider("Contour Levels", 2, 16, 2)
+        with col_sm:
+            smoothing = st.slider("Smoothing", 0.0, 10.0, 2.0)
         
         # Calculate parameters for preview
         w, h = image.size
@@ -608,6 +586,15 @@ with col_images:
         </div>
         """, unsafe_allow_html=True)
     else:
+        # Defaults when no image uploaded
+        output_height = 1000.0
+        spot_size = 5.0
+        threshold = 200
+        brightness = 1.0
+        contrast = 1.0
+        outline_levels = 2
+        smoothing = 2.0
+        
         # Placeholder when no image
         st.markdown("""
         <div style="display: flex; gap: 1rem; margin-top: 1rem;">
@@ -684,8 +671,8 @@ if uploaded_file:
             try:
                 uploaded_file.seek(0)
                 
-                # For dithering mode, apply brightness/contrast to image before conversion
-                if mode == "floyd_steinberg" and (brightness != 1.0 or contrast != 1.0):
+                # Apply brightness/contrast adjustments if needed
+                if brightness != 1.0 or contrast != 1.0:
                     img_for_conversion = image.copy().convert('L')
                     if brightness != 1.0:
                         enhancer = ImageEnhance.Brightness(img_for_conversion)
