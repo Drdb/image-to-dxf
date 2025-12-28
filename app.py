@@ -19,7 +19,7 @@ COMPLEX_EXAMPLE_B64 = "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKC
 
 # Page configuration
 st.set_page_config(
-    page_title="Image to DXF Converter",
+    page_title="Bitmap To DXF Converter",
     page_icon="☕",
     layout="wide"
 )
@@ -457,8 +457,8 @@ def generate_preview(image, mode, threshold, invert, line_step, brightness=1.0, 
 # Hero header
 st.markdown("""
 <div class="hero-container">
-    <div class="hero-title">☕ Image to DXF</div>
-    <div class="hero-subtitle">Transform your images into precision laser-ready DXF files</div>
+    <div class="hero-title">☕ Bitmap To DXF</div>
+    <div class="hero-subtitle">Transform your images into precision fabrication-ready DXF files</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -523,21 +523,8 @@ with col_settings:
         help="Tool or laser spot size in same units"
     )
     
-    # Mode-specific settings
-    if mode == "threshold":
-        threshold = st.slider("Threshold", 0, 255, 200, help="Pixels darker than this become marks")
-        brightness = 1.0
-        contrast = 1.0
-    elif mode == "floyd_steinberg":
-        threshold = 200
-        st.markdown('<div style="color: #e8d5b5; font-size: 0.9rem; margin-top: 0.5rem;">Image Adjustments</div>', unsafe_allow_html=True)
-        brightness = st.slider("Brightness", 0.2, 2.0, 1.0, 0.1, help="Adjust image brightness before dithering")
-        contrast = st.slider("Contrast", 0.2, 2.0, 1.0, 0.1, help="Adjust image contrast before dithering")
-    else:
-        threshold = 200
-        brightness = 1.0
-        contrast = 1.0
-    
+    # Mode-specific defaults (sliders moved under images)
+    # Outline-specific settings stay here since they don't need preview
     if mode == "outline":
         outline_levels = st.slider("Contour Levels", 2, 16, 2)
         smoothing = st.slider("Smoothing", 0.0, 10.0, 2.0)
@@ -556,6 +543,25 @@ with col_settings:
 
 with col_images:
     if uploaded_file:
+        # Image adjustment controls - right above the preview for easy adjustment
+        st.markdown('<div class="section-title" style="margin-bottom: 0.5rem;">🎨 Image Adjustments</div>', unsafe_allow_html=True)
+        
+        if mode == "threshold":
+            threshold = st.slider("Threshold", 0, 255, 200, help="Pixels darker than this become marks")
+            brightness = 1.0
+            contrast = 1.0
+        elif mode == "floyd_steinberg":
+            threshold = 200
+            col_b, col_c = st.columns(2)
+            with col_b:
+                brightness = st.slider("Brightness", 0.2, 2.0, 1.0, 0.1, help="Adjust brightness")
+            with col_c:
+                contrast = st.slider("Contrast", 0.2, 2.0, 1.0, 0.1, help="Adjust contrast")
+        else:
+            threshold = 200
+            brightness = 1.0
+            contrast = 1.0
+        
         # Calculate parameters for preview
         w, h = image.size
         aspect_ratio = w / h
