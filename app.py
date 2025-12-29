@@ -554,7 +554,7 @@ with col_images:
         # Define controls FIRST (to get values) but in the second container
         with controls_container:
             # Ultra-compact controls - all in 2 rows
-            # Row 1: Height, Spot Size / Tool Size, Threshold
+            # Row 1: Height, Spot Size, Threshold
             c1, c2, c3 = st.columns(3)
             with c1:
                 output_height = st.number_input("Height", min_value=1.0, max_value=1000000.0, value=1000.0, step=100.0)
