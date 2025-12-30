@@ -477,7 +477,7 @@ def notify_new_registration(customer_email, filename):
         if not api_key:
             return  # Silent fail - don't block the user
         
-        owner_email = os.environ.get("OWNER_EMAIL", "db1.bender@gmail.com")
+        owner_email = os.environ.get("OWNER_EMAIL", "db.benderly@gmail.com")
         
         requests.post(
             "https://api.resend.com/emails",
@@ -1079,7 +1079,7 @@ if uploaded_file:
                                     },
                                     json={
                                         "from": "onboarding@resend.dev",
-                                        "to": ["db1.bender@gmail.com"],
+                                        "to": ["db.benderly@gmail.com"],
                                         "subject": f"New DXF Download: {customer_email}",
                                         "html": f"<p>Customer: {customer_email}</p><p>File: {st.session_state.get('filename', 'unknown')}</p>"
                                     }
