@@ -8,7 +8,6 @@ from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageEnhance
 import io
 import base64
 import math
-import requests
 from converter import BitmapToDXFConverter
 
 # Example images embedded as base64 (static content - no file loading needed)
@@ -468,86 +467,6 @@ PAYMENT_LINKS = {
 converter = BitmapToDXFConverter()
 
 
-def send_dxf_email(recipient_email, dxf_content, filename):
-    """Send DXF file to customer via email using Resend API."""
-    import os
-    
-    try:
-        # Get API key from environment or Streamlit secrets
-        api_key = os.environ.get("RESEND_API_KEY")
-        if not api_key:
-            try:
-                api_key = st.secrets.get("resend", {}).get("api_key")
-            except:
-                pass
-        
-        if not api_key:
-            return False, "Email service not configured. Please contact support."
-        
-        # Prepare the email
-        from_email = os.environ.get("FROM_EMAIL", "onboarding@resend.dev")
-        
-        # Email body
-        html_body = f"""
-        <h2>Thank you for your purchase!</h2>
-        <p>Your converted DXF file <strong>"{filename}"</strong> is attached to this email.</p>
-        
-        <h3>🎉 Premium Benefit</h3>
-        <p>You can return to the converter and create <strong>unlimited variations</strong> 
-        of this same image with different settings - just enter this email address again 
-        to receive each new version.</p>
-        
-        <h3>Tips for best results:</h3>
-        <ul>
-            <li>Try different Threshold values to adjust detail level</li>
-            <li>Adjust Brightness and Contrast before conversion</li>
-            <li>Use the Preview to see exactly what you'll get</li>
-        </ul>
-        
-        <p>Need help? Reply to this email with any questions.</p>
-        
-        <p>Thank you for supporting independent software development!</p>
-        
-        <p>Best regards,<br>
-        <strong>Bitmap To DXF Converter</strong><br>
-        <a href="https://www.bitmaptodxf.com">www.bitmaptodxf.com</a></p>
-        """
-        
-        # Encode DXF content to base64
-        dxf_bytes = dxf_content.encode() if isinstance(dxf_content, str) else dxf_content
-        dxf_base64 = base64.b64encode(dxf_bytes).decode()
-        
-        # Send via Resend API
-        response = requests.post(
-            "https://api.resend.com/emails",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "from": from_email,
-                "to": [recipient_email],
-                "subject": f"Your DXF File: {filename} - Bitmap To DXF Converter",
-                "html": html_body,
-                "attachments": [
-                    {
-                        "filename": filename,
-                        "content": dxf_base64
-                    }
-                ]
-            }
-        )
-        
-        if response.status_code == 200:
-            return True, "Email sent successfully!"
-        else:
-            error_msg = response.json().get("message", "Unknown error")
-            return False, f"Failed to send email: {error_msg}"
-            
-    except Exception as e:
-        return False, f"Failed to send email: {str(e)}"
-
-
 def generate_preview(image, mode, threshold, invert, flip_y, line_step, brightness=1.0, contrast=1.0, outline_levels=2, smoothing=2.0):
     """Generate a high-fidelity preview of the DXF output - black on white like CAD software."""
     img = image.copy().convert('L')
@@ -917,7 +836,7 @@ if uploaded_file:
     st.markdown("""
     <div style="text-align: center; margin-bottom: 1rem;">
         <div class="section-title" style="justify-content: center; font-size: 1.3rem;">☕ Support the Developer</div>
-        <p style="color: #a0a0b0; font-size: 0.9rem; margin: 0;">Choose a coffee to unlock Dithering mode • File delivered to your email</p>
+        <p style="color: #a0a0b0; font-size: 0.9rem; margin: 0;">If you find this tool useful, consider buying a coffee!</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -1033,31 +952,30 @@ if uploaded_file:
         
         # Check if payment is required (only for dithering mode)
         if mode == "floyd_steinberg":
-            # Initialize verified emails dict if not exists
-            if 'verified_emails' not in st.session_state:
-                st.session_state['verified_emails'] = {}
+            # Initialize registered emails dict if not exists
+            if 'registered_emails' not in st.session_state:
+                st.session_state['registered_emails'] = {}
             
             current_file = st.session_state.get('last_uploaded_file', '')
-            verified_email_for_file = st.session_state['verified_emails'].get(current_file, None)
+            registered_email = st.session_state['registered_emails'].get(current_file, None)
             
-            if verified_email_for_file:
-                # This customer has already paid for this image - unlimited downloads!
+            if registered_email:
+                # User already registered for this image - unlimited downloads!
                 st.markdown(f"""
                 <div style="background: linear-gradient(135deg, rgba(76,175,80,0.2), rgba(76,175,80,0.1)); 
                             border: 1px solid rgba(76,175,80,0.4); border-radius: 10px; padding: 1rem; 
                             text-align: center; margin: 1rem 0;">
                     <div style="color: #4CAF50; font-size: 1.1rem; font-weight: 600; margin-bottom: 0.3rem;">
-                        ✓ Premium Access Active
+                        ✓ Download Unlocked
                     </div>
                     <div style="color: #a0a0b0; font-size: 0.85rem;">
-                        Unlimited conversions for this image • {verified_email_for_file}
+                        Unlimited conversions for this image • {registered_email}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                col_dl1, col_dl2 = st.columns(2)
-                with col_dl1:
-                    # Direct download
+                col_dl = st.columns([1, 2, 1])[1]
+                with col_dl:
                     st.download_button(
                         label="⬇️ Download DXF",
                         data=st.session_state['dxf_content'],
@@ -1065,75 +983,50 @@ if uploaded_file:
                         mime="application/dxf",
                         use_container_width=True
                     )
-                with col_dl2:
-                    # Also offer email option
-                    if st.button("📧 Email Me a Copy", use_container_width=True):
-                        success, message = send_dxf_email(
-                            verified_email_for_file,
-                            st.session_state['dxf_content'],
-                            st.session_state['filename']
-                        )
-                        if success:
-                            st.success(f"✓ Sent to {verified_email_for_file}")
-                        else:
-                            st.error(message)
                 
                 st.markdown("""
                 <div style="color: #808080; font-size: 0.75rem; text-align: center; margin-top: 0.5rem;">
-                    💡 Adjust settings above and convert again - unlimited variations included!
+                    💡 Adjust settings above and convert again - unlimited variations!
                 </div>
                 """, unsafe_allow_html=True)
             
             else:
-                # New customer - needs to pay and verify
+                # New user - collect email and encourage payment
                 st.markdown("""
                 <div style="background: linear-gradient(135deg, rgba(232,180,120,0.2), rgba(232,180,120,0.1)); 
                             border: 1px solid rgba(232,180,120,0.4); border-radius: 10px; padding: 1rem; 
                             text-align: center; margin: 1rem 0;">
                     <div style="color: #e8b478; font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem;">
-                        ☕ Premium Feature - Dithering Mode
+                        ☕ Dithering Mode - Support the Developer
                     </div>
-                    <div style="color: #c0c0c0; font-size: 0.9rem; line-height: 1.5;">
-                        <strong>How it works:</strong><br>
-                        1. Complete a coffee purchase above<br>
-                        2. Enter the email you used for payment below<br>
-                        3. Receive your DXF instantly via email
+                    <div style="color: #c0c0c0; font-size: 0.9rem; line-height: 1.6;">
+                        This advanced feature took significant effort to develop.<br>
+                        If you find it useful, please consider buying a coffee above!
                     </div>
                     <div style="color: #4CAF50; font-size: 0.85rem; margin-top: 0.8rem; padding: 0.5rem; 
                                 background: rgba(76,175,80,0.1); border-radius: 6px;">
-                        ✨ <strong>Premium Benefit:</strong> Unlimited conversions of this image!<br>
-                        Adjust settings and regenerate as many times as you need.
+                        ✨ Enter your email to unlock <strong>unlimited conversions</strong> of this image
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Email input for verification
-                col_email, col_send = st.columns([2, 1])
+                # Email input
+                col_email, col_unlock = st.columns([2, 1])
                 with col_email:
                     customer_email = st.text_input(
-                        "Email used for payment",
+                        "Your email address",
                         placeholder="your.email@example.com",
                         label_visibility="collapsed"
                     )
-                with col_send:
-                    send_clicked = st.button("📧 Send My DXF", use_container_width=True, type="primary")
+                with col_unlock:
+                    unlock_clicked = st.button("🔓 Unlock Download", use_container_width=True, type="primary")
                 
-                if send_clicked:
+                if unlock_clicked:
                     if customer_email and '@' in customer_email and '.' in customer_email:
-                        with st.spinner("Sending your DXF file..."):
-                            success, message = send_dxf_email(
-                                customer_email,
-                                st.session_state['dxf_content'],
-                                st.session_state['filename']
-                            )
-                        if success:
-                            # Mark this email as verified for this file
-                            st.session_state['verified_emails'][current_file] = customer_email
-                            st.success(f"✓ DXF sent to {customer_email}! Check your inbox.")
-                            st.info("🎉 Premium access activated! You can now adjust settings and download unlimited variations of this image.")
-                            st.rerun()
-                        else:
-                            st.error(message)
+                        # Register this email for this file
+                        st.session_state['registered_emails'][current_file] = customer_email
+                        st.success("✓ Download unlocked! Thank you!")
+                        st.rerun()
                     else:
                         st.error("Please enter a valid email address.")
         
