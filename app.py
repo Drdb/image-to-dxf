@@ -598,40 +598,79 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# How to Use expander (collapsible instructions)
-with st.expander("📖 How to Use This Tool", expanded=False):
-    st.markdown("""
-    <div style="color: #e8d5b5; line-height: 1.7;">
-    
-    **Quick Start Guide:**
-    
-    1. **Upload your image** – Drag and drop or click to browse. Supports PNG, JPG, BMP, GIF, TIFF formats.
-    
-    2. **Select Conversion Mode:**
-       - 🔲 **Threshold (Lines)** – Creates horizontal scan lines. Best for simple graphics. *Free download*
-       - ✏️ **Outline (Contours)** – Extracts edge contours at multiple gray levels. Great for artistic effects. *Free download*
-       - ⚫ **Dithering (Dots)** – Floyd-Steinberg dithering creates dot patterns for true grayscale reproduction. *Premium feature*
-    
-    3. **Adjust Settings:**
-       - **Height** – Output height in your machine units (microns by default)
-       - **Spot size – Tool size** – Your laser spot or tool diameter
-       - **Threshold** – Cutoff value for black/white (0-255)
-       - **Bright/Contrast** – Adjust image before conversion
-       - **Contours** – Number of gray levels for Outline mode
-       - **Smooth** – Edge smoothing for Outline mode
-    
-    4. **Preview** – The right panel shows exactly what your DXF will look like (black on white, like CAD software)
-    
-    5. **Convert & Download** – Click the Convert button, then download your DXF file
-    
-    **Tips:**
-    - Use **Invert** if your image has a dark background
-    - Use **Flip Y** if your machine uses a different coordinate system
-    - **Bidirectional** alternates scan direction for faster marking
-    - Large images may take a moment to process – watch for the progress indicator
-    
+# How to Use button - styled prominently
+st.markdown("""
+<style>
+    .help-expander {
+        background: linear-gradient(135deg, rgba(232,180,120,0.2) 0%, rgba(232,180,120,0.1) 100%);
+        border: 1px solid rgba(232,180,120,0.4);
+        border-radius: 10px;
+        margin-bottom: 1rem;
+    }
+    .help-expander summary {
+        color: #e8b478 !important;
+        font-size: 1.1rem !important;
+        font-weight: 600 !important;
+        padding: 0.8rem 1rem !important;
+        cursor: pointer;
+    }
+    .help-expander summary:hover {
+        background: rgba(232,180,120,0.15);
+    }
+    .help-content {
+        padding: 1rem 1.2rem;
+        color: #e8d5b5;
+        line-height: 1.8;
+        font-size: 0.95rem;
+    }
+    .help-content h4 {
+        color: #e8b478;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+    }
+    .help-content ul {
+        margin-left: 1rem;
+    }
+    .help-content li {
+        margin-bottom: 0.4rem;
+    }
+</style>
+<details class="help-expander">
+    <summary>📖 HOW TO USE THIS TOOL — Click to expand</summary>
+    <div class="help-content">
+        <h4>Quick Start Guide</h4>
+        <ol>
+            <li><strong>Upload your image</strong> – Drag and drop or click to browse. Supports PNG, JPG, BMP, GIF, TIFF.</li>
+            <li><strong>Select Conversion Mode:</strong>
+                <ul>
+                    <li>🔲 <strong>Threshold (Lines)</strong> – Horizontal scan lines. Best for simple graphics. <em>Free download</em></li>
+                    <li>✏️ <strong>Outline (Contours)</strong> – Edge contours at multiple gray levels. <em>Free download</em></li>
+                    <li>⚫ <strong>Dithering (Dots)</strong> – Floyd-Steinberg dithering for true grayscale. <em>Premium feature</em></li>
+                </ul>
+            </li>
+            <li><strong>Adjust Settings:</strong>
+                <ul>
+                    <li><strong>Height</strong> – Output height in your preferred units (DXF is unit-independent)</li>
+                    <li><strong>Spot size – Tool size</strong> – Your laser spot or tool diameter</li>
+                    <li><strong>Threshold</strong> – Cutoff value for black/white (0-255)</li>
+                    <li><strong>Bright/Contrast</strong> – Adjust image before conversion</li>
+                    <li><strong>Contours</strong> – Number of gray levels for Outline mode</li>
+                    <li><strong>Smooth</strong> – Edge smoothing for Outline mode</li>
+                </ul>
+            </li>
+            <li><strong>Preview</strong> – The right panel shows exactly what your DXF will look like</li>
+            <li><strong>Convert & Download</strong> – Click Convert, then download your DXF file</li>
+        </ol>
+        <h4>Tips</h4>
+        <ul>
+            <li>Use <strong>Invert</strong> if your image has a dark background</li>
+            <li>Use <strong>Flip Y</strong> if your machine uses a different coordinate system</li>
+            <li><strong>Bidirectional</strong> alternates scan direction for faster marking</li>
+            <li>Large images may take a moment to process – watch for the progress indicator</li>
+        </ul>
     </div>
-    """, unsafe_allow_html=True)
+</details>
+""", unsafe_allow_html=True)
 
 # Main layout: Settings on left, Images on right
 col_settings, col_images = st.columns([1, 2], gap="large")
@@ -703,7 +742,7 @@ with col_images:
             c1, c2, c3 = st.columns(3)
             with c1:
                 output_height = st.number_input("Height", min_value=1.0, max_value=1000000.0, value=1000.0, step=100.0,
-                    help="Output height in machine units (typically microns). Width is calculated to maintain aspect ratio.")
+                    help="Output height in your preferred units. DXF files are unit-independent—your CAD/CAM software interprets the scale.")
             with c2:
                 spot_size = st.number_input("Spot size – Tool size", min_value=0.1, max_value=1000.0, value=5.0, step=1.0,
                     help="Your laser spot diameter or CNC tool size. This determines the spacing between scan lines/dots.")
