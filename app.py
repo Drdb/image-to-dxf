@@ -995,6 +995,14 @@ if uploaded_file:
             
             if registered_email:
                 # User already registered for this image - unlimited downloads!
+                # Show any notification debug info
+                if 'notification_status' in st.session_state:
+                    if st.session_state['notification_status']:
+                        st.warning(st.session_state['notification_status'])
+                    else:
+                        st.success("✓ Download unlocked! Thank you!")
+                    del st.session_state['notification_status']
+                
                 st.markdown(f"""
                 <div style="background: linear-gradient(135deg, rgba(76,175,80,0.2), rgba(76,175,80,0.1)); 
                             border: 1px solid rgba(76,175,80,0.4); border-radius: 10px; padding: 1rem; 
@@ -1057,11 +1065,35 @@ if uploaded_file:
                 
                 if unlock_clicked:
                     if customer_email and '@' in customer_email and '.' in customer_email:
+                        # Notify owner of new registration
+                        import os
+                        api_key = os.environ.get("RESEND_API_KEY")
+                        notification_status = None
+                        if api_key:
+                            try:
+                                response = requests.post(
+                                    "https://api.resend.com/emails",
+                                    headers={
+                                        "Authorization": f"Bearer {api_key}",
+                                        "Content-Type": "application/json"
+                                    },
+                                    json={
+                                        "from": "onboarding@resend.dev",
+                                        "to": ["db.benderly@gmail.com"],
+                                        "subject": f"New DXF Download: {customer_email}",
+                                        "html": f"<p>Customer: {customer_email}</p><p>File: {st.session_state.get('filename', 'unknown')}</p>"
+                                    }
+                                )
+                                if response.status_code != 200:
+                                    notification_status = f"Notification failed: {response.text}"
+                            except Exception as e:
+                                notification_status = f"Notification error: {e}"
+                        else:
+                            notification_status = "RESEND_API_KEY not found"
+                        
                         # Register this email for this file
                         st.session_state['registered_emails'][current_file] = customer_email
-                        # Notify owner of new registration
-                        notify_new_registration(customer_email, st.session_state.get('filename', 'unknown'))
-                        st.success("✓ Download unlocked! Thank you!")
+                        st.session_state['notification_status'] = notification_status
                         st.rerun()
                     else:
                         st.error("Please enter a valid email address.")
