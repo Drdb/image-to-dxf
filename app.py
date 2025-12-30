@@ -108,6 +108,16 @@ st.markdown("""
         letter-spacing: 1px;
     }
     
+    .hero-subsubtitle {
+        font-family: 'Source Sans Pro', sans-serif;
+        font-size: 0.95rem;
+        color: #808090;
+        font-weight: 300;
+        font-style: italic;
+        margin-top: 0.5rem;
+        letter-spacing: 0.5px;
+    }
+    
     /* Section titles */
     .section-title {
         font-family: 'Playfair Display', Georgia, serif;
@@ -352,6 +362,97 @@ st.markdown("""
         .coffee-grid { grid-template-columns: 1fr; }
         .stats-grid { grid-template-columns: repeat(2, 1fr); }
     }
+    
+    /* Tooltip styling for info icons */
+    .tooltip-container {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    
+    .info-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        background: rgba(232,180,120,0.3);
+        border-radius: 50%;
+        font-size: 10px;
+        color: #e8b478;
+        cursor: help;
+        font-weight: bold;
+        transition: all 0.2s ease;
+    }
+    
+    .info-icon:hover {
+        background: rgba(232,180,120,0.5);
+        transform: scale(1.1);
+    }
+    
+    .tooltip-text {
+        visibility: hidden;
+        opacity: 0;
+        position: absolute;
+        z-index: 1000;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #1a1a2e;
+        color: #e8d5b5;
+        padding: 0.6rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        white-space: nowrap;
+        max-width: 250px;
+        white-space: normal;
+        border: 1px solid rgba(232,180,120,0.3);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        transition: all 0.2s ease;
+    }
+    
+    .tooltip-text::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #1a1a2e transparent transparent transparent;
+    }
+    
+    .tooltip-container:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+    }
+    
+    /* Processing indicator */
+    .processing-banner {
+        background: linear-gradient(90deg, rgba(232,180,120,0.2), rgba(232,180,120,0.1), rgba(232,180,120,0.2));
+        background-size: 200% 100%;
+        animation: shimmer 2s infinite;
+        border: 1px solid rgba(232,180,120,0.3);
+        border-radius: 8px;
+        padding: 0.8rem;
+        text-align: center;
+        color: #e8b478;
+        margin: 0.5rem 0;
+    }
+    
+    @keyframes shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+    }
+    
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        background: rgba(232,180,120,0.1) !important;
+        border: 1px solid rgba(232,180,120,0.2) !important;
+        border-radius: 8px !important;
+        color: #e8b478 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -492,9 +593,45 @@ def generate_preview(image, mode, threshold, invert, flip_y, line_step, brightne
 st.markdown("""
 <div class="hero-container">
     <div class="hero-title">Bitmap To DXF</div>
-    <div class="hero-subtitle">Transform your images into precision fabrication-ready DXF files</div>
+    <div class="hero-subtitle">The most advanced image-to-DXF conversion software for digital fabrication</div>
+    <div class="hero-subsubtitle">The only DXF conversion tool designed to translate true grayscale images into machine-engraveable vector geometry</div>
 </div>
 """, unsafe_allow_html=True)
+
+# How to Use expander (collapsible instructions)
+with st.expander("📖 How to Use This Tool", expanded=False):
+    st.markdown("""
+    <div style="color: #e8d5b5; line-height: 1.7;">
+    
+    **Quick Start Guide:**
+    
+    1. **Upload your image** – Drag and drop or click to browse. Supports PNG, JPG, BMP, GIF, TIFF formats.
+    
+    2. **Select Conversion Mode:**
+       - 🔲 **Threshold (Lines)** – Creates horizontal scan lines. Best for simple graphics. *Free download*
+       - ✏️ **Outline (Contours)** – Extracts edge contours at multiple gray levels. Great for artistic effects. *Free download*
+       - ⚫ **Dithering (Dots)** – Floyd-Steinberg dithering creates dot patterns for true grayscale reproduction. *Premium feature*
+    
+    3. **Adjust Settings:**
+       - **Height** – Output height in your machine units (microns by default)
+       - **Spot size – Tool size** – Your laser spot or tool diameter
+       - **Threshold** – Cutoff value for black/white (0-255)
+       - **Bright/Contrast** – Adjust image before conversion
+       - **Contours** – Number of gray levels for Outline mode
+       - **Smooth** – Edge smoothing for Outline mode
+    
+    4. **Preview** – The right panel shows exactly what your DXF will look like (black on white, like CAD software)
+    
+    5. **Convert & Download** – Click the Convert button, then download your DXF file
+    
+    **Tips:**
+    - Use **Invert** if your image has a dark background
+    - Use **Flip Y** if your machine uses a different coordinate system
+    - **Bidirectional** alternates scan direction for faster marking
+    - Large images may take a moment to process – watch for the progress indicator
+    
+    </div>
+    """, unsafe_allow_html=True)
 
 # Main layout: Settings on left, Images on right
 col_settings, col_images = st.columns([1, 2], gap="large")
@@ -516,11 +653,19 @@ with col_settings:
     st.markdown("<hr style='margin: 1rem 0;'>", unsafe_allow_html=True)
     
     # Settings section
-    st.markdown('<div class="section-title">⚙️ Settings</div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div class="section-title">
+        ⚙️ Settings
+        <span class="tooltip-container">
+            <span class="info-icon">i</span>
+            <span class="tooltip-text">Configure conversion parameters. Hover over any setting for more details.</span>
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Radio buttons for conversion mode (all 3 visible)
     mode = st.radio(
-        "Conversion Mode",
+        "Select Conversion Mode",
         options=["threshold", "floyd_steinberg", "outline"],
         format_func=lambda x: {
             "threshold": "🔲 Threshold (Lines)",
@@ -539,10 +684,10 @@ with col_settings:
     st.markdown('<div style="color: #e8d5b5; font-size: 0.9rem; margin-top: 0.5rem;">Options</div>', unsafe_allow_html=True)
     col_o1, col_o2 = st.columns(2)
     with col_o1:
-        invert = st.checkbox("Invert", value=False)
-        flip_y = st.checkbox("Flip Y", value=False)
+        invert = st.checkbox("Invert", value=False, help="Swap black and white. Use for images with dark backgrounds.")
+        flip_y = st.checkbox("Flip Y", value=False, help="Flip the image vertically. Use if your machine has an inverted Y axis.")
     with col_o2:
-        bidirectional = st.checkbox("Bidirectional", value=True)
+        bidirectional = st.checkbox("Bidirectional", value=True, help="Alternate scan direction each line for faster processing.")
 
 with col_images:
     if uploaded_file:
@@ -557,22 +702,29 @@ with col_images:
             # Row 1: Height, Spot Size, Threshold
             c1, c2, c3 = st.columns(3)
             with c1:
-                output_height = st.number_input("Height", min_value=1.0, max_value=1000000.0, value=1000.0, step=100.0)
+                output_height = st.number_input("Height", min_value=1.0, max_value=1000000.0, value=1000.0, step=100.0,
+                    help="Output height in machine units (typically microns). Width is calculated to maintain aspect ratio.")
             with c2:
-                spot_size = st.number_input("Spot Size", min_value=0.1, max_value=1000.0, value=5.0, step=1.0)
+                spot_size = st.number_input("Spot size – Tool size", min_value=0.1, max_value=1000.0, value=5.0, step=1.0,
+                    help="Your laser spot diameter or CNC tool size. This determines the spacing between scan lines/dots.")
             with c3:
-                threshold = st.slider("Threshold", 0, 255, 200)
+                threshold = st.slider("Threshold", 0, 255, 200,
+                    help="Gray level cutoff (0-255). Pixels darker than this become black. Adjust to control detail level.")
             
             # Row 2: Brightness, Contrast, Contours, Smoothing
             c4, c5, c6, c7 = st.columns(4)
             with c4:
-                brightness = st.slider("Bright", 0.2, 2.0, 1.0, 0.1)
+                brightness = st.slider("Bright", 0.2, 2.0, 1.0, 0.1,
+                    help="Adjust image brightness before conversion. Values >1 brighten, <1 darken.")
             with c5:
-                contrast = st.slider("Contrast", 0.2, 2.0, 1.0, 0.1)
+                contrast = st.slider("Contrast", 0.2, 2.0, 1.0, 0.1,
+                    help="Adjust image contrast before conversion. Higher values increase contrast.")
             with c6:
-                outline_levels = st.slider("Contours", 2, 16, 2)
+                outline_levels = st.slider("Contours", 2, 16, 2,
+                    help="Number of gray levels for Outline mode. More levels = more detail but more complexity.")
             with c7:
-                smoothing = st.slider("Smooth", 0.0, 10.0, 2.0)
+                smoothing = st.slider("Smooth", 0.0, 10.0, 2.0,
+                    help="Edge smoothing for Outline mode. Higher values create smoother, less jagged contours.")
         
         # Calculate parameters for preview
         w, h = image.size
@@ -600,8 +752,9 @@ with col_images:
                 st.image(preview_img, use_container_width=True)
                 st.markdown('</div>', unsafe_allow_html=True)
             
-            # Compact stats - single line
+            # Compact stats - single line with processing note
             st.markdown(f'<div style="text-align: center; color: #a0a0b0; font-size: 0.8rem; margin: 0.25rem 0;">Output: {output_width:.0f} × {output_height:.0f} | Step: {line_step} | Lines: {h // line_step}</div>', unsafe_allow_html=True)
+            st.markdown('<div style="text-align: center; color: #606070; font-size: 0.7rem; font-style: italic;">💡 Large images may take a moment to preview. The running indicator shows when processing is active.</div>', unsafe_allow_html=True)
     else:
         # Defaults when no image uploaded
         output_height = 1000.0
@@ -684,7 +837,7 @@ if uploaded_file:
         convert_clicked = st.button("⚡ Convert to DXF", type="primary", use_container_width=True)
     
     if convert_clicked:
-        with st.spinner("Converting..."):
+        with st.spinner("🔄 Generating DXF... This may take a moment for large images. Please wait."):
             try:
                 uploaded_file.seek(0)
                 
@@ -755,20 +908,31 @@ if uploaded_file:
             """, unsafe_allow_html=True)
         
         with col_r2:
-            st.download_button(
-                label="⬇️ Download DXF",
-                data=st.session_state['dxf_content'],
-                file_name=st.session_state['filename'],
-                mime="application/dxf",
-                use_container_width=True
-            )
+            # Check if payment is required (only for dithering mode)
+            if mode == "floyd_steinberg":
+                # Dithering mode requires payment
+                st.markdown("""
+                <div style="background: rgba(232,180,120,0.15); border: 1px solid rgba(232,180,120,0.4); border-radius: 8px; padding: 0.8rem; text-align: center;">
+                    <div style="color: #e8b478; font-weight: 600; margin-bottom: 0.3rem;">☕ Premium Feature</div>
+                    <div style="color: #a0a0b0; font-size: 0.85rem;">Dithering mode requires a coffee purchase to download. Please support the developer above!</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                # Threshold and Outline modes are free
+                st.download_button(
+                    label="⬇️ Download DXF",
+                    data=st.session_state['dxf_content'],
+                    file_name=st.session_state['filename'],
+                    mime="application/dxf",
+                    use_container_width=True
+                )
 
 # Footer
 st.markdown("""
 <div class="footer">
     <div class="footer-text">
         Image to DXF Converter • Built with ❤️ for makers<br>
-        <span style="font-size: 0.75rem;">Precision tools for laser cutting & CNC</span>
+        <span style="font-size: 0.75rem;">Precision tools for laser marking & CNC machining.</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
