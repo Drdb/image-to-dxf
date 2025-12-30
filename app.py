@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageEnhance
 import io
 import base64
 import math
+import requests
 from converter import BitmapToDXFConverter
 
 # Example images embedded as base64 (static content - no file loading needed)
@@ -465,6 +466,39 @@ PAYMENT_LINKS = {
 
 # Initialize converter
 converter = BitmapToDXFConverter()
+
+
+def notify_new_registration(customer_email, filename):
+    """Send notification to owner when someone registers."""
+    import os
+    
+    try:
+        api_key = os.environ.get("RESEND_API_KEY")
+        if not api_key:
+            return  # Silent fail - don't block the user
+        
+        owner_email = os.environ.get("OWNER_EMAIL", "db.benderly@gmail.com")
+        
+        requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "from": "onboarding@resend.dev",
+                "to": [owner_email],
+                "subject": f"New DXF Download: {customer_email}",
+                "html": f"""
+                <h3>New Dithering Download</h3>
+                <p><strong>Customer Email:</strong> {customer_email}</p>
+                <p><strong>File:</strong> {filename}</p>
+                <p>Add to your mailing list!</p>
+                """
+            }
+        )
+    except:
+        pass  # Silent fail - don't block the user
 
 
 def generate_preview(image, mode, threshold, invert, flip_y, line_step, brightness=1.0, contrast=1.0, outline_levels=2, smoothing=2.0):
@@ -1025,6 +1059,8 @@ if uploaded_file:
                     if customer_email and '@' in customer_email and '.' in customer_email:
                         # Register this email for this file
                         st.session_state['registered_emails'][current_file] = customer_email
+                        # Notify owner of new registration
+                        notify_new_registration(customer_email, st.session_state.get('filename', 'unknown'))
                         st.success("✓ Download unlocked! Thank you!")
                         st.rerun()
                     else:
