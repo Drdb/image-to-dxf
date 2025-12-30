@@ -474,13 +474,17 @@ converter = BitmapToDXFConverter()
 
 def send_dxf_email(recipient_email, dxf_content, filename):
     """Send DXF file to customer via email."""
+    import os
     try:
-        # Get SMTP credentials from Streamlit secrets
-        smtp_server = st.secrets["smtp"]["server"]
-        smtp_port = st.secrets["smtp"]["port"]
-        smtp_user = st.secrets["smtp"]["user"]
-        smtp_password = st.secrets["smtp"]["password"]
-        from_email = st.secrets["smtp"]["from_email"]
+        # Try Railway environment variables first, then Streamlit secrets
+        smtp_server = os.environ.get("SMTP_SERVER") or st.secrets.get("smtp", {}).get("server")
+        smtp_port = int(os.environ.get("SMTP_PORT") or st.secrets.get("smtp", {}).get("port", 587))
+        smtp_user = os.environ.get("SMTP_USER") or st.secrets.get("smtp", {}).get("user")
+        smtp_password = os.environ.get("SMTP_PASSWORD") or st.secrets.get("smtp", {}).get("password")
+        from_email = os.environ.get("SMTP_FROM_EMAIL") or st.secrets.get("smtp", {}).get("from_email")
+        
+        if not all([smtp_server, smtp_user, smtp_password, from_email]):
+            return False, "Email service not configured. Please contact support."
         
         # Create message
         msg = MIMEMultipart()
@@ -527,8 +531,6 @@ www.bitmaptodxf.com
             server.send_message(msg)
         
         return True, "Email sent successfully!"
-    except KeyError as e:
-        return False, "Email service not configured. Please contact support."
     except Exception as e:
         return False, f"Failed to send email: {str(e)}"
 
