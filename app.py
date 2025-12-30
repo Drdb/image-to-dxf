@@ -477,7 +477,7 @@ def notify_new_registration(customer_email, filename):
         if not api_key:
             return  # Silent fail - don't block the user
         
-        owner_email = os.environ.get("OWNER_EMAIL", "db.benderly@gmail.com")
+        owner_email = os.environ.get("OWNER_EMAIL", "db1.bender@gmail.com")
         
         requests.post(
             "https://api.resend.com/emails",
@@ -522,9 +522,12 @@ def generate_preview(image, mode, threshold, invert, flip_y, line_step, brightne
     if invert:
         img = ImageOps.invert(img)
     
-    # Apply flip Y if needed
-    # flip_y=False (default) shows upright, flip_y=True flips the image
-    if flip_y:
+    # Apply flip Y to match DXF output
+    # In DXF/CAD: Y=0 is at bottom. In images: Y=0 is at top.
+    # flip_y=True means we flip coordinates so image appears right-side up in CAD
+    # flip_y=False means image will appear inverted in CAD
+    # Preview should show what CAD will show:
+    if not flip_y:
         img = ImageOps.flip(img)
     
     px = img.load()
@@ -1079,7 +1082,7 @@ if uploaded_file:
                                     },
                                     json={
                                         "from": "onboarding@resend.dev",
-                                        "to": ["db.benderly@gmail.com"],
+                                        "to": ["db1.bender@gmail.com"],
                                         "subject": f"New DXF Download: {customer_email}",
                                         "html": f"<p>Customer: {customer_email}</p><p>File: {st.session_state.get('filename', 'unknown')}</p>"
                                     }
