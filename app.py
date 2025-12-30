@@ -376,19 +376,20 @@ st.markdown("""
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 16px;
-        height: 16px;
-        background: rgba(232,180,120,0.3);
+        width: 18px;
+        height: 18px;
+        background: #e8b478;
         border-radius: 50%;
-        font-size: 10px;
-        color: #e8b478;
+        font-size: 11px;
+        color: #1a1a2e;
         cursor: help;
         font-weight: bold;
         transition: all 0.2s ease;
+        border: 1px solid #d4a366;
     }
     
     .info-icon:hover {
-        background: rgba(232,180,120,0.5);
+        background: #f0c896;
         transform: scale(1.1);
     }
     
@@ -523,11 +524,8 @@ def generate_preview(image, mode, threshold, invert, flip_y, line_step, brightne
         img = ImageOps.invert(img)
     
     # Apply flip Y to match DXF output
-    # In DXF/CAD: Y=0 is at bottom. In images: Y=0 is at top.
-    # flip_y=True means we flip coordinates so image appears right-side up in CAD
-    # flip_y=False means image will appear inverted in CAD
-    # Preview should show what CAD will show:
-    if not flip_y:
+    # When Flip Y is checked, flip the preview to show how it will appear in CAD
+    if flip_y:
         img = ImageOps.flip(img)
     
     px = img.load()
