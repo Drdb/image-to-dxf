@@ -376,21 +376,36 @@ st.markdown("""
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 18px;
-        height: 18px;
-        background: #e8b478;
+        width: 20px;
+        height: 20px;
+        background: #ff9500;
         border-radius: 50%;
-        font-size: 11px;
-        color: #1a1a2e;
+        font-size: 13px;
+        color: #ffffff;
         cursor: help;
         font-weight: bold;
         transition: all 0.2s ease;
-        border: 1px solid #d4a366;
+        border: 2px solid #ffffff;
+        box-shadow: 0 0 4px rgba(255,149,0,0.5);
     }
     
     .info-icon:hover {
-        background: #f0c896;
-        transform: scale(1.1);
+        background: #ffaa33;
+        transform: scale(1.15);
+        box-shadow: 0 0 8px rgba(255,149,0,0.8);
+    }
+    
+    /* Streamlit built-in help tooltip icons */
+    [data-testid="stTooltipIcon"] {
+        color: #ff9500 !important;
+    }
+    [data-testid="stTooltipIcon"] svg {
+        stroke: #ff9500 !important;
+        width: 18px !important;
+        height: 18px !important;
+    }
+    [data-testid="stTooltipIcon"]:hover svg {
+        stroke: #ffaa33 !important;
     }
     
     .tooltip-text {
@@ -943,7 +958,7 @@ if uploaded_file:
                     spot_spacing_factor=1.1,
                     threshold=threshold,
                     invert=invert,
-                    flip_y=flip_y,
+                    flip_y=not flip_y,
                     bidirectional=bidirectional,
                     outline_levels=outline_levels,
                     smoothing_amount=smoothing,
