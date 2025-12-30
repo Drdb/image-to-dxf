@@ -8,11 +8,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageEnhance
 import io
 import base64
 import math
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
-from email.mime.text import MIMEText
-from email import encoders
+import requests
 from converter import BitmapToDXFConverter
 
 # Example images embedded as base64 (static content - no file loading needed)
@@ -473,64 +469,81 @@ converter = BitmapToDXFConverter()
 
 
 def send_dxf_email(recipient_email, dxf_content, filename):
-    """Send DXF file to customer via email."""
+    """Send DXF file to customer via email using Resend API."""
     import os
+    
     try:
-        # Try Railway environment variables first, then Streamlit secrets
-        smtp_server = os.environ.get("SMTP_SERVER") or st.secrets.get("smtp", {}).get("server")
-        smtp_port = int(os.environ.get("SMTP_PORT") or st.secrets.get("smtp", {}).get("port", 587))
-        smtp_user = os.environ.get("SMTP_USER") or st.secrets.get("smtp", {}).get("user")
-        smtp_password = os.environ.get("SMTP_PASSWORD") or st.secrets.get("smtp", {}).get("password")
-        from_email = os.environ.get("SMTP_FROM_EMAIL") or st.secrets.get("smtp", {}).get("from_email")
+        # Get API key from environment or Streamlit secrets
+        api_key = os.environ.get("RESEND_API_KEY")
+        if not api_key:
+            try:
+                api_key = st.secrets.get("resend", {}).get("api_key")
+            except:
+                pass
         
-        if not all([smtp_server, smtp_user, smtp_password, from_email]):
+        if not api_key:
             return False, "Email service not configured. Please contact support."
         
-        # Create message
-        msg = MIMEMultipart()
-        msg['From'] = from_email
-        msg['To'] = recipient_email
-        msg['Subject'] = f"Your DXF File: {filename} - Bitmap To DXF Converter"
+        # Prepare the email
+        from_email = os.environ.get("FROM_EMAIL", "onboarding@resend.dev")
         
         # Email body
-        body = f"""
-Thank you for your purchase from Bitmap To DXF Converter!
-
-Your converted DXF file "{filename}" is attached to this email.
-
-PREMIUM BENEFIT: You can return to the converter and create unlimited variations 
-of this same image with different settings - just enter this email address again 
-to receive each new version.
-
-Tips for best results:
-• Try different Threshold values to adjust detail level
-• Adjust Brightness and Contrast before conversion
-• Use the Preview to see exactly what you'll get
-
-Need help? Reply to this email with any questions.
-
-Thank you for supporting independent software development!
-
-Best regards,
-Bitmap To DXF Converter
-www.bitmaptodxf.com
-"""
-        msg.attach(MIMEText(body, 'plain'))
+        html_body = f"""
+        <h2>Thank you for your purchase!</h2>
+        <p>Your converted DXF file <strong>"{filename}"</strong> is attached to this email.</p>
         
-        # Attach DXF file
-        attachment = MIMEBase('application', 'dxf')
-        attachment.set_payload(dxf_content.encode() if isinstance(dxf_content, str) else dxf_content)
-        encoders.encode_base64(attachment)
-        attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
-        msg.attach(attachment)
+        <h3>🎉 Premium Benefit</h3>
+        <p>You can return to the converter and create <strong>unlimited variations</strong> 
+        of this same image with different settings - just enter this email address again 
+        to receive each new version.</p>
         
-        # Send email
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_password)
-            server.send_message(msg)
+        <h3>Tips for best results:</h3>
+        <ul>
+            <li>Try different Threshold values to adjust detail level</li>
+            <li>Adjust Brightness and Contrast before conversion</li>
+            <li>Use the Preview to see exactly what you'll get</li>
+        </ul>
         
-        return True, "Email sent successfully!"
+        <p>Need help? Reply to this email with any questions.</p>
+        
+        <p>Thank you for supporting independent software development!</p>
+        
+        <p>Best regards,<br>
+        <strong>Bitmap To DXF Converter</strong><br>
+        <a href="https://www.bitmaptodxf.com">www.bitmaptodxf.com</a></p>
+        """
+        
+        # Encode DXF content to base64
+        dxf_bytes = dxf_content.encode() if isinstance(dxf_content, str) else dxf_content
+        dxf_base64 = base64.b64encode(dxf_bytes).decode()
+        
+        # Send via Resend API
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "from": from_email,
+                "to": [recipient_email],
+                "subject": f"Your DXF File: {filename} - Bitmap To DXF Converter",
+                "html": html_body,
+                "attachments": [
+                    {
+                        "filename": filename,
+                        "content": dxf_base64
+                    }
+                ]
+            }
+        )
+        
+        if response.status_code == 200:
+            return True, "Email sent successfully!"
+        else:
+            error_msg = response.json().get("message", "Unknown error")
+            return False, f"Failed to send email: {error_msg}"
+            
     except Exception as e:
         return False, f"Failed to send email: {str(e)}"
 
