@@ -750,27 +750,27 @@ with col_settings:
     st.markdown("<hr style='margin: 1rem 0;'>", unsafe_allow_html=True)
     
     # Settings section
-    st.markdown("""
-    <div class="section-title">
-        ⚙️ Settings
-        <span class="tooltip-container">
-            <span class="info-icon">i</span>
-            <span class="tooltip-text">Configure conversion parameters. Hover over any setting for more details.</span>
-        </span>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown('<div class="section-title">⚙️ Settings</div>', unsafe_allow_html=True)
     
-    # Radio buttons for conversion mode (all 3 visible)
+    st.markdown('<div style="color: #e8d5b5; font-size: 0.9rem; margin-bottom: 0.3rem;">Conversion Mode</div>', unsafe_allow_html=True)
+    
+    # Radio buttons for conversion mode
     mode = st.radio(
-        "Select Conversion Mode",
+        "Conversion Mode",
         options=["outline", "threshold", "floyd_steinberg"],
         format_func=lambda x: {
-            "outline": "🟦 Outline (Contours)\n          Vector outline of edges; best for logos and line art.",
-            "threshold": "🟨 Threshold Fill (Engraving Lines)\n          Black/white fill as line toolpaths; best for high-contrast graphics.",
-            "floyd_steinberg": "⬛ Continuous-Tone (Dithered Toolpath)\n         Photographic look via short-segment toolpaths (grayscale emulation)."
+            "outline": "🟦 Outline (Contours)",
+            "threshold": "🟨 Threshold Fill (Engraving Lines)",
+            "floyd_steinberg": "⬛ Continuous-Tone (Dithered Toolpath)"
         }[x],
         horizontal=False,
-        index=2  # Default to Continuous-Tone (floyd_steinberg)
+        index=2,  # Default to Continuous-Tone (floyd_steinberg)
+        label_visibility="collapsed",
+        captions=[
+            "Vector outline of edges; best for logos and line art.",
+            "Black/white fill as line toolpaths; best for high-contrast graphics.",
+            "Photographic look via short-segment toolpaths (grayscale emulation)."
+        ]
     )
     
     
@@ -859,14 +859,40 @@ with col_images:
         default_image_bytes = base64.b64decode(DITHER_DEFAULT_B64)
         default_image = Image.open(io.BytesIO(default_image_bytes))
         
-        # Defaults for dithering mode
-        output_height = 5000.0
-        spot_size = 1.0
-        threshold = 200
-        brightness = 1.0
-        contrast = 1.0
-        outline_levels = 2
-        smoothing = 2.0
+        # Create containers to control visual order
+        # Images will appear first, controls below
+        image_container = st.container()
+        controls_container = st.container()
+        
+        # Define controls FIRST (to get values) but in the second container
+        with controls_container:
+            # Ultra-compact controls - all in 2 rows
+            # Row 1: Height, Spot Size, Threshold
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                output_height = st.number_input("Height", min_value=1.0, max_value=1000000.0, value=5000.0, step=100.0,
+                    help="Output height in your preferred units: match engraving size to beam/tool diameter (size-to-spot ratio drives detail)", key="default_height")
+            with c2:
+                spot_size = st.number_input("Spot size – Tool size", min_value=0.1, max_value=1000.0, value=1.0, step=1.0,
+                    help="Your laser spot diameter or CNC tool size. This determines the spacing between scan lines/dots.", key="default_spot")
+            with c3:
+                threshold = st.slider("Threshold", 0, 255, 200,
+                    help="Gray level cutoff (0-255). Pixels darker than this become black. Adjust to control detail level.", key="default_threshold")
+            
+            # Row 2: Brightness, Contrast, Contours, Smoothing
+            c4, c5, c6, c7 = st.columns(4)
+            with c4:
+                brightness = st.slider("Bright", 0.2, 2.0, 1.0, 0.1,
+                    help="Adjust image brightness before conversion. Values >1 brighten, <1 darken.", key="default_bright")
+            with c5:
+                contrast = st.slider("Contrast", 0.2, 2.0, 1.0, 0.1,
+                    help="Adjust image contrast before conversion. Higher values increase contrast.", key="default_contrast")
+            with c6:
+                outline_levels = st.slider("Contours", 2, 16, 2,
+                    help="Number of gray levels for Outline mode. More levels = more detail but more complexity.", key="default_contours")
+            with c7:
+                smoothing = st.slider("Smooth", 0.0, 10.0, 2.0,
+                    help="Edge smoothing for Outline mode. Higher values create smoother, less jagged contours.", key="default_smooth")
         
         # Calculate parameters for preview
         w, h = default_image.size
@@ -876,23 +902,27 @@ with col_images:
         min_spacing = spot_size * 1.1
         line_step = max(1, int(math.ceil(min_spacing / pixel_size_y)))
         
-        # Display default example with dithering preview
-        col_orig, col_preview = st.columns(2, gap="small")
-        
-        with col_orig:
-            st.markdown('<div class="image-container">', unsafe_allow_html=True)
-            st.markdown('<div class="image-label">Example Image</div>', unsafe_allow_html=True)
-            st.image(default_image, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        with col_preview:
-            st.markdown('<div class="image-container" style="background: #ffffff;">', unsafe_allow_html=True)
-            st.markdown('<div class="image-label" style="color: #1a1a2e;">DXF Preview (Dithering)</div>', unsafe_allow_html=True)
-            preview_img = generate_preview(default_image, "floyd_steinberg", threshold, False, False, line_step, brightness, contrast, outline_levels, smoothing)
-            st.image(preview_img, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown(f'<div style="text-align: center; color: #a0a0b0; font-size: 0.8rem; margin: 0.25rem 0;">Example: {output_width:.0f} × {output_height:.0f} | Step: {line_step} | Upload your own image to convert</div>', unsafe_allow_html=True)
+        # Now fill the IMAGE container (appears FIRST visually)
+        with image_container:
+            # Two images side by side
+            col_orig, col_preview = st.columns(2, gap="small")
+            
+            with col_orig:
+                st.markdown('<div class="image-container">', unsafe_allow_html=True)
+                st.markdown('<div class="image-label">Example Image</div>', unsafe_allow_html=True)
+                st.image(default_image, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            with col_preview:
+                st.markdown('<div class="image-container" style="background: #ffffff;">', unsafe_allow_html=True)
+                st.markdown('<div class="image-label" style="color: #1a1a2e;">DXF Preview</div>', unsafe_allow_html=True)
+                preview_img = generate_preview(default_image, mode, threshold, invert, flip_y, line_step, brightness, contrast, outline_levels, smoothing)
+                st.image(preview_img, use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Compact stats - single line with processing note
+            st.markdown(f'<div style="text-align: center; color: #a0a0b0; font-size: 0.8rem; margin: 0.25rem 0;">Output: {output_width:.0f} × {output_height:.0f} | Step: {line_step} | Lines: {h // line_step}</div>', unsafe_allow_html=True)
+            st.markdown('<div style="text-align: center; color: #606070; font-size: 0.7rem; font-style: italic;">💡 Upload your own image to convert and download DXF</div>', unsafe_allow_html=True)
 
 # Only show payment and convert sections if image is uploaded
 if uploaded_file:
