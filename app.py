@@ -695,14 +695,14 @@ st.markdown("""
             <li><strong>Upload your image</strong> – Drag and drop or click to browse. Supports PNG, JPG, BMP, GIF, TIFF.</li>
             <li><strong>Select Conversion Mode:</strong>
                 <ul>
-                    <li>🔲 <strong>Threshold (Lines)</strong> – Horizontal scan lines. Best for simple graphics. <em>Free download</em></li>
-                    <li>✏️ <strong>Outline (Contours)</strong> – Edge contours at multiple gray levels. <em>Free download</em></li>
-                    <li>⚫ <strong>Dithering (Dots)</strong> – Floyd-Steinberg dithering for true grayscale. <em>Premium feature</em></li>
+                    <li>🟦 <strong>Outline (Contours)</strong> – Vector outline of edges; best for logos and line art.</li>
+                    <li>🟨 <strong>Threshold Fill (Engraving Lines)</strong> – Black/white fill as line toolpaths; best for high-contrast graphics.</li>
+                    <li>⬛ <strong>Continuous-Tone (Dithered Toolpath)</strong> – Photographic look via short-segment toolpaths (grayscale emulation).</li>
                 </ul>
             </li>
             <li><strong>Adjust Settings:</strong>
                 <ul>
-                    <li><strong>Height</strong> – Output height in your preferred units (DXF is unit-independent)</li>
+                    <li><strong>Height</strong> – Output height in your preferred units: match engraving size to beam/tool diameter (size-to-spot ratio drives detail)</li>
                     <li><strong>Spot size – Tool size</strong> – Your laser spot or tool diameter</li>
                     <li><strong>Threshold</strong> – Cutoff value for black/white (0-255)</li>
                     <li><strong>Bright/Contrast</strong> – Adjust image before conversion</li>
