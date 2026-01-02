@@ -496,18 +496,16 @@ def notify_new_registration(customer_email, filename):
         if not api_key:
             return  # Silent fail - don't block the user
         
-        owner_email = os.environ.get("OWNER_EMAIL", "db1.bender@gmail.com")
-        # Use verified domain email, or fallback to onboarding@resend.dev (only works for sending to yourself)
-        from_email = os.environ.get("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+        owner_email = os.environ.get("OWNER_EMAIL", "db.benderly@gmail.com")
         
-        response = requests.post(
+        requests.post(
             "https://api.resend.com/emails",
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             },
             json={
-                "from": from_email,
+                "from": "onboarding@resend.dev",
                 "to": [owner_email],
                 "subject": f"New DXF Download: {customer_email}",
                 "html": f"""
@@ -518,11 +516,8 @@ def notify_new_registration(customer_email, filename):
                 """
             }
         )
-        # Log any errors for debugging (will show in Railway logs)
-        if response.status_code != 200:
-            print(f"Notification failed: {response.text}")
-    except Exception as e:
-        print(f"Notification error: {e}")  # Log but don't block user
+    except:
+        pass  # Silent fail - don't block the user
 
 
 def generate_preview(image, mode, threshold, invert, flip_y, line_step, brightness=1.0, contrast=1.0, outline_levels=2, smoothing=2.0):
@@ -1146,7 +1141,7 @@ if uploaded_file:
                                     },
                                     json={
                                         "from": "onboarding@resend.dev",
-                                        "to": ["db1.bender@gmail.com"],
+                                        "to": ["db.benderly@gmail.com"],
                                         "subject": f"New DXF Download: {customer_email}",
                                         "html": f"<p>Customer: {customer_email}</p><p>File: {st.session_state.get('filename', 'unknown')}</p>"
                                     }
