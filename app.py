@@ -466,12 +466,37 @@ st.markdown("""
         100% { background-position: 200% 0; }
     }
     
-    /* Expander styling */
-    .streamlit-expanderHeader {
+    /* Expander styling - comprehensive fix */
+    .streamlit-expanderHeader,
+    [data-testid="stExpander"] > details > summary {
         background: rgba(232,180,120,0.1) !important;
         border: 1px solid rgba(232,180,120,0.2) !important;
         border-radius: 8px !important;
+    }
+    
+    /* Make expander header text visible */
+    .streamlit-expanderHeader p,
+    .streamlit-expanderHeader span,
+    [data-testid="stExpander"] summary,
+    [data-testid="stExpander"] summary span,
+    [data-testid="stExpander"] summary p,
+    [data-testid="stExpander"] details summary > div,
+    [data-testid="stExpander"] details summary > div > p,
+    [data-testid="stExpander"] [data-testid="stMarkdownContainer"],
+    [data-testid="stExpander"] [data-testid="stMarkdownContainer"] p {
         color: #e8b478 !important;
+        font-size: 1rem !important;
+        font-weight: 500 !important;
+    }
+    
+    /* Hide keyboard shortcut hints */
+    [data-testid="stExpander"] [data-testid="InputInstructions"],
+    [data-testid="InputInstructions"],
+    .st-emotion-cache-1xarl3l,
+    div[class*="instructions"],
+    span[class*="instructions"] {
+        display: none !important;
+        visibility: hidden !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1181,32 +1206,69 @@ if uploaded_file:
                     use_container_width=True
                 )
 
-# Privacy Policy Section
-with st.expander("Privacy Policy"):
-    st.markdown("""
+# Privacy Policy Section - Custom styled
+st.markdown("""
 <style>
-.privacy-text {
-    color: #ffffff !important;
+.privacy-toggle {
+    background: rgba(232,180,120,0.1);
+    border: 1px solid rgba(232,180,120,0.3);
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    margin: 2rem 0 1rem 0;
+    cursor: pointer;
+    color: #e8b478;
+    font-size: 1rem;
+    font-weight: 500;
+}
+.privacy-toggle:hover {
+    background: rgba(232,180,120,0.2);
+}
+.privacy-content-box {
+    background: rgba(30,30,40,0.5);
+    border: 1px solid rgba(232,180,120,0.2);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    padding: 1.5rem;
+    margin-top: -0.5rem;
+    color: #ffffff;
     font-size: 0.9rem;
     line-height: 1.8;
 }
-.privacy-text h3 {
-    color: #e8b478 !important;
+.privacy-content-box h3 {
+    color: #e8b478;
     margin-top: 1.5rem;
     margin-bottom: 0.5rem;
+    font-size: 1.1rem;
 }
-.privacy-text p, .privacy-text li {
-    color: #ffffff !important;
+.privacy-content-box h3:first-child {
+    margin-top: 0;
 }
-.privacy-text strong {
-    color: #e8d5b5 !important;
+.privacy-content-box p {
+    color: #ffffff;
+    margin: 0.5rem 0;
 }
-.privacy-text hr {
-    border-color: rgba(232,180,120,0.3);
+.privacy-content-box strong {
+    color: #e8d5b5;
+}
+.privacy-content-box ul {
+    color: #ffffff;
+    margin: 0.5rem 0 0.5rem 1.5rem;
+}
+.privacy-content-box li {
+    color: #ffffff;
+    margin-bottom: 0.3rem;
+}
+.privacy-content-box hr {
+    border: none;
+    border-top: 1px solid rgba(232,180,120,0.2);
     margin: 1rem 0;
 }
 </style>
-<div class="privacy-text">
+""", unsafe_allow_html=True)
+
+with st.expander("📄 Privacy Policy", expanded=False):
+    st.markdown("""
+<div class="privacy-content-box">
 
 <p><strong>Operator:</strong> DBC International ("DBC," "we," "us," "our")<br>
 <strong>Service:</strong> bitmaptodxf.com<br>
