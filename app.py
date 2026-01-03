@@ -1182,89 +1182,119 @@ if uploaded_file:
                 )
 
 # Privacy Policy Section
-with st.expander("🔒 Privacy Policy"):
+with st.expander("Privacy Policy"):
     st.markdown("""
-**Operator:** DBC International ("DBC," "we," "us," "our")  
-**Service:** bitmaptodxf.com  
-**Contact:** support@bitmaptodxf.com  
-**Effective date:** January 1, 2026
+<style>
+.privacy-text {
+    color: #ffffff !important;
+    font-size: 0.9rem;
+    line-height: 1.8;
+}
+.privacy-text h3 {
+    color: #e8b478 !important;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+.privacy-text p, .privacy-text li {
+    color: #ffffff !important;
+}
+.privacy-text strong {
+    color: #e8d5b5 !important;
+}
+.privacy-text hr {
+    border-color: rgba(232,180,120,0.3);
+    margin: 1rem 0;
+}
+</style>
+<div class="privacy-text">
 
-Your files should not become someone else's data. We designed bitmaptodxf.com so conversions can happen without creating a permanent archive of what you upload.
+<p><strong>Operator:</strong> DBC International ("DBC," "we," "us," "our")<br>
+<strong>Service:</strong> bitmaptodxf.com<br>
+<strong>Contact:</strong> support@bitmaptodxf.com<br>
+<strong>Effective date:</strong> January 1, 2026</p>
 
----
+<p>Your files should not become someone else's data. We designed bitmaptodxf.com so conversions can happen without creating a permanent archive of what you upload.</p>
 
-### 1) What We Collect
+<hr>
 
-**A. Files you upload for conversion**  
-We do not store your uploaded files or your converted DXF files. Files are processed only to generate the output you request and are handled transiently during the conversion process (for example, in memory and temporary runtime handling). After the conversion is complete (or your session ends), we do not retain those files.
+<h3>1) What We Collect</h3>
 
-**B. Email addresses you submit**  
-We may collect and retain an email address when you voluntarily provide it (for example, for support, troubleshooting, or when you choose to support the project).
+<p><strong>A. Files you upload for conversion</strong><br>
+We do not store your uploaded files or your converted DXF files. Files are processed only to generate the output you request and are handled transiently during the conversion process (for example, in memory and temporary runtime handling). After the conversion is complete (or your session ends), we do not retain those files.</p>
 
-**C. Basic technical data**  
-Our infrastructure providers may automatically collect limited technical information, such as: IP address, browser type/device information, timestamps, and diagnostic logs.
+<p><strong>B. Email addresses you submit</strong><br>
+We may collect and retain an email address when you voluntarily provide it (for example, for support, troubleshooting, or when you choose to support the project).</p>
 
----
+<p><strong>C. Basic technical data</strong><br>
+Our infrastructure providers may automatically collect limited technical information, such as: IP address, browser type/device information, timestamps, and diagnostic logs.</p>
 
-### 2) How We Use Information
+<hr>
 
-**Uploaded files:** We use uploaded files only to perform the conversion you request. We do not sell, rent, or share uploaded file content for marketing purposes, and we do not retain it after processing.
+<h3>2) How We Use Information</h3>
 
-**Email addresses:** We use retained email addresses for support and troubleshooting, and thank-you emails to users who voluntarily contribute. We do not sell your email address or share it with third parties for marketing.
+<p><strong>Uploaded files:</strong> We use uploaded files only to perform the conversion you request. We do not sell, rent, or share uploaded file content for marketing purposes, and we do not retain it after processing.</p>
 
----
+<p><strong>Email addresses:</strong> We use retained email addresses for support and troubleshooting, and thank-you emails to users who voluntarily contribute. We do not sell your email address or share it with third parties for marketing.</p>
 
-### 3) Files You Upload
+<hr>
 
-Your uploaded file is handled only long enough to complete your conversion request. Your converted DXF is generated and delivered to you, and then not retained by us. If you prefer not to have a file processed online, please do not upload it.
+<h3>3) Files You Upload</h3>
 
----
+<p>Your uploaded file is handled only long enough to complete your conversion request. Your converted DXF is generated and delivered to you, and then not retained by us. If you prefer not to have a file processed online, please do not upload it.</p>
 
-### 4) Voluntary Contributions (Stripe)
+<hr>
 
-If you choose to make a voluntary contribution ("buy a coffee"), the payment is processed by Stripe. We do not receive or store your full payment card details. We may receive your email address, name (if provided), contribution amount, and transaction reference for thank-you emails and support.
+<h3>4) Voluntary Contributions (Stripe)</h3>
 
----
+<p>If you choose to make a voluntary contribution ("buy a coffee"), the payment is processed by Stripe. We do not receive or store your full payment card details. We may receive your email address, name (if provided), contribution amount, and transaction reference for thank-you emails and support.</p>
 
-### 5) When We Share Information
+<hr>
 
-We do not sell personal information. We may share limited information only with:
-- **Service providers:** Third-party providers (hosting, payment processing, email delivery) who process data on our behalf
-- **Legal and safety:** When required to comply with law or protect users
+<h3>5) When We Share Information</h3>
 
----
+<p>We do not sell personal information. We may share limited information only with:</p>
+<ul>
+<li><strong>Service providers:</strong> Third-party providers (hosting, payment processing, email delivery) who process data on our behalf</li>
+<li><strong>Legal and safety:</strong> When required to comply with law or protect users</li>
+</ul>
 
-### 6) Data Retention
+<hr>
 
-- **Uploaded files and converted DXFs:** Not retained after processing
-- **Email addresses:** Retained until you request deletion
-- **Technical logs:** Retained only as needed for security and diagnostics
+<h3>6) Data Retention</h3>
 
----
+<ul>
+<li><strong>Uploaded files and converted DXFs:</strong> Not retained after processing</li>
+<li><strong>Email addresses:</strong> Retained until you request deletion</li>
+<li><strong>Technical logs:</strong> Retained only as needed for security and diagnostics</li>
+</ul>
 
-### 7) Your Choices
+<hr>
 
-You can request that we confirm whether we have your email address on file, correct it, or delete it. Contact support@bitmaptodxf.com and we will respond within a reasonable timeframe.
+<h3>7) Your Choices</h3>
 
----
+<p>You can request that we confirm whether we have your email address on file, correct it, or delete it. Contact support@bitmaptodxf.com and we will respond within a reasonable timeframe.</p>
 
-### 8) Security
+<hr>
 
-We take reasonable measures to protect the information we handle. However, no system can guarantee absolute security. Please avoid uploading highly sensitive personal data.
+<h3>8) Security</h3>
 
----
+<p>We take reasonable measures to protect the information we handle. However, no system can guarantee absolute security. Please avoid uploading highly sensitive personal data.</p>
 
-### 9) Changes to This Policy
+<hr>
 
-We may update this Privacy Policy as the Service evolves. When we do, we will update the Effective Date and post the revised policy here.
+<h3>9) Changes to This Policy</h3>
 
----
+<p>We may update this Privacy Policy as the Service evolves. When we do, we will update the Effective Date and post the revised policy here.</p>
 
-### 10) Contact
+<hr>
 
-**DBC International**  
-Email: support@bitmaptodxf.com
-    """)
+<h3>10) Contact</h3>
+
+<p><strong>DBC International</strong><br>
+Email: support@bitmaptodxf.com</p>
+
+</div>
+    """, unsafe_allow_html=True)
 
 # Footer
 st.markdown("""
