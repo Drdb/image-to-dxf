@@ -466,37 +466,12 @@ st.markdown("""
         100% { background-position: 200% 0; }
     }
     
-    /* Expander styling - comprehensive fix */
+    /* Expander styling for How To Use section */
     .streamlit-expanderHeader,
     [data-testid="stExpander"] > details > summary {
         background: rgba(232,180,120,0.1) !important;
         border: 1px solid rgba(232,180,120,0.2) !important;
         border-radius: 8px !important;
-    }
-    
-    /* Make expander header text visible */
-    .streamlit-expanderHeader p,
-    .streamlit-expanderHeader span,
-    [data-testid="stExpander"] summary,
-    [data-testid="stExpander"] summary span,
-    [data-testid="stExpander"] summary p,
-    [data-testid="stExpander"] details summary > div,
-    [data-testid="stExpander"] details summary > div > p,
-    [data-testid="stExpander"] [data-testid="stMarkdownContainer"],
-    [data-testid="stExpander"] [data-testid="stMarkdownContainer"] p {
-        color: #e8b478 !important;
-        font-size: 1rem !important;
-        font-weight: 500 !important;
-    }
-    
-    /* Hide keyboard shortcut hints */
-    [data-testid="stExpander"] [data-testid="InputInstructions"],
-    [data-testid="InputInstructions"],
-    .st-emotion-cache-1xarl3l,
-    div[class*="instructions"],
-    span[class*="instructions"] {
-        display: none !important;
-        visibility: hidden !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1206,30 +1181,25 @@ if uploaded_file:
                     use_container_width=True
                 )
 
-# Privacy Policy Section - Custom styled
+# Privacy Policy Section - Using checkbox toggle instead of expander
 st.markdown("""
 <style>
-.privacy-toggle {
+.privacy-header {
     background: rgba(232,180,120,0.1);
     border: 1px solid rgba(232,180,120,0.3);
     border-radius: 8px;
     padding: 0.8rem 1rem;
-    margin: 2rem 0 1rem 0;
-    cursor: pointer;
+    margin: 2rem 0 0.5rem 0;
     color: #e8b478;
     font-size: 1rem;
     font-weight: 500;
 }
-.privacy-toggle:hover {
-    background: rgba(232,180,120,0.2);
-}
 .privacy-content-box {
     background: rgba(30,30,40,0.5);
     border: 1px solid rgba(232,180,120,0.2);
-    border-top: none;
-    border-radius: 0 0 8px 8px;
+    border-radius: 8px;
     padding: 1.5rem;
-    margin-top: -0.5rem;
+    margin-bottom: 1rem;
     color: #ffffff;
     font-size: 0.9rem;
     line-height: 1.8;
@@ -1266,7 +1236,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-with st.expander("📄 Privacy Policy", expanded=False):
+show_privacy = st.checkbox("📄 Privacy Policy", value=False, key="privacy_toggle")
+
+if show_privacy:
     st.markdown("""
 <div class="privacy-content-box">
 
