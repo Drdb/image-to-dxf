@@ -488,37 +488,66 @@ converter = BitmapToDXFConverter()
 
 
 def notify_new_registration(customer_email, filename):
-    """Send notification to owner when someone registers."""
+    """Notify the site owner when someone unlocks a DXF download.
+
+    - Uses RESEND_API_KEY for auth
+    - Uses FROM_EMAIL (defaults to onboarding@resend.dev for testing)
+    - Uses OWNER_EMAIL / OWNER_EMAILS for recipients
+    - If FROM_EMAIL is a resend.dev testing sender, Resend will only deliver to the
+      account owner's email. To avoid surprises, we force the recipient to
+      RESEND_TEST_RECIPIENT (defaults to db.benderly@gmail.com) in that case.
+
+    Returns:
+        None on success, otherwise a short error string suitable for debugging.
+    """
     import os
-    
+    import re
+    import requests
+
+    api_key = os.environ.get("RESEND_API_KEY")
+    if not api_key:
+        # Non-blocking: do not prevent the user from downloading.
+        return "RESEND_API_KEY not set"
+
+    from_email = (os.environ.get("FROM_EMAIL") or "onboarding@resend.dev").strip()
+
+    # Allow a single email (OWNER_EMAIL) or a comma/space separated list (OWNER_EMAILS).
+    owner_emails_raw = os.environ.get("OWNER_EMAILS") or os.environ.get("OWNER_EMAIL") or "db.benderly@gmail.com"
+    owner_emails = [e.strip() for e in re.split(r"[,\s]+", owner_emails_raw) if e.strip()]
+
+    # Resend testing sender restriction: only deliver to your own Resend account email.
+    if from_email.lower().endswith("@resend.dev"):
+        test_recipient = (os.environ.get("RESEND_TEST_RECIPIENT") or "db.benderly@gmail.com").strip()
+        owner_emails = [test_recipient]
+
+    payload = {
+        "from": from_email,
+        "to": owner_emails,
+        "subject": f"New DXF Download: {customer_email}",
+        "html": (
+            "<h3>New DXF Download</h3>"
+            f"<p><strong>Customer:</strong> {customer_email}</p>"
+            f"<p><strong>File:</strong> {filename}</p>"
+        ),
+    }
+
     try:
-        api_key = os.environ.get("RESEND_API_KEY")
-        if not api_key:
-            return  # Silent fail - don't block the user
-        
-        owner_email = os.environ.get("OWNER_EMAIL", "db.benderly@gmail.com")
-        
-        requests.post(
+        resp = requests.post(
             "https://api.resend.com/emails",
             headers={
                 "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
             },
-            json={
-                "from": "onboarding@resend.dev",
-                "to": [owner_email],
-                "subject": f"New DXF Download: {customer_email}",
-                "html": f"""
-                <h3>New Dithering Download</h3>
-                <p><strong>Customer Email:</strong> {customer_email}</p>
-                <p><strong>File:</strong> {filename}</p>
-                <p>Add to your mailing list!</p>
-                """
-            }
+            json=payload,
+            timeout=10,
         )
-    except:
-        pass  # Silent fail - don't block the user
+    except requests.RequestException as e:
+        return f"Resend request error: {e}"
 
+    if not (200 <= resp.status_code < 300):
+        return f"Resend failed ({resp.status_code}): {resp.text}"
+
+    return None
 
 def generate_preview(image, mode, threshold, invert, flip_y, line_step, brightness=1.0, contrast=1.0, outline_levels=2, smoothing=2.0):
     """Generate a high-fidelity preview of the DXF output - black on white like CAD software."""
@@ -1127,35 +1156,15 @@ if uploaded_file:
                 
                 if unlock_clicked:
                     if customer_email and '@' in customer_email and '.' in customer_email:
-                        # Notify owner of new registration
-                        import os
-                        api_key = os.environ.get("RESEND_API_KEY")
-                        notification_status = None
-                        if api_key:
-                            try:
-                                response = requests.post(
-                                    "https://api.resend.com/emails",
-                                    headers={
-                                        "Authorization": f"Bearer {api_key}",
-                                        "Content-Type": "application/json"
-                                    },
-                                    json={
-                                        "from": "onboarding@resend.dev",
-                                        "to": ["db.benderly@gmail.com"],
-                                        "subject": f"New DXF Download: {customer_email}",
-                                        "html": f"<p>Customer: {customer_email}</p><p>File: {st.session_state.get('filename', 'unknown')}</p>"
-                                    }
-                                )
-                                if response.status_code != 200:
-                                    notification_status = f"Notification failed: {response.text}"
-                            except Exception as e:
-                                notification_status = f"Notification error: {e}"
-                        else:
-                            notification_status = "RESEND_API_KEY not found"
                         
-                        # Register this email for this file
+                        # Notify owner of new registration (non-blocking)
+                        notification_status = notify_new_registration(
+                            customer_email=customer_email,
+                            filename=st.session_state.get("filename", "unknown"),
+                        )
                         st.session_state['registered_emails'][current_file] = customer_email
                         st.session_state['notification_status'] = notification_status
+
                         st.rerun()
                     else:
                         st.error("Please enter a valid email address.")
@@ -1172,12 +1181,115 @@ if uploaded_file:
                     use_container_width=True
                 )
 
+# Privacy Policy Section
+st.markdown("""
+<style>
+    .privacy-expander {
+        background: linear-gradient(135deg, rgba(100,100,120,0.15) 0%, rgba(100,100,120,0.05) 100%);
+        border: 1px solid rgba(150,150,170,0.3);
+        border-radius: 10px;
+        margin: 2rem 0 1rem 0;
+    }
+    .privacy-expander summary {
+        color: #a0a0b0 !important;
+        font-size: 0.95rem !important;
+        font-weight: 500 !important;
+        padding: 0.7rem 1rem !important;
+        cursor: pointer;
+    }
+    .privacy-expander summary:hover {
+        background: rgba(150,150,170,0.1);
+    }
+    .privacy-content {
+        padding: 1rem 1.5rem;
+        color: #c0c0c8;
+        line-height: 1.7;
+        font-size: 0.85rem;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .privacy-content h3 {
+        color: #e8b478;
+        font-size: 1.1rem;
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+    }
+    .privacy-content h4 {
+        color: #d0d0d8;
+        font-size: 0.95rem;
+        margin-top: 1rem;
+        margin-bottom: 0.3rem;
+    }
+    .privacy-content p {
+        margin: 0.4rem 0;
+    }
+    .privacy-content ul {
+        margin: 0.3rem 0 0.3rem 1.2rem;
+        padding: 0;
+    }
+    .privacy-content li {
+        margin-bottom: 0.2rem;
+    }
+</style>
+<details class="privacy-expander">
+    <summary>🔒 Privacy Policy</summary>
+    <div class="privacy-content">
+        <h3>Privacy Policy</h3>
+        <p><strong>Operator:</strong> DBC International ("DBC," "we," "us," "our")<br>
+        <strong>Service:</strong> bitmaptodxf.com<br>
+        <strong>Contact:</strong> support@bitmaptodxf.com<br>
+        <strong>Effective date:</strong> January 1, 2026</p>
+        
+        <p>Your files should not become someone else's data. We designed bitmaptodxf.com so conversions can happen without creating a permanent archive of what you upload.</p>
+        
+        <h4>1) What We Collect</h4>
+        <p><strong>A. Files you upload:</strong> We do not store your uploaded files or converted DXF files. Files are processed transiently in memory and are not retained after conversion.</p>
+        <p><strong>B. Email addresses:</strong> We collect email addresses only when you voluntarily provide them (for support or when you choose to support the project).</p>
+        <p><strong>C. Technical data:</strong> Our infrastructure may collect limited technical information (IP address, browser type, timestamps) for diagnostics and security.</p>
+        
+        <h4>2) How We Use Information</h4>
+        <ul>
+            <li><strong>Uploaded files:</strong> Used only to perform the conversion you request. Not sold, rented, or shared.</li>
+            <li><strong>Email addresses:</strong> Used for support, troubleshooting, and thank-you emails to contributors. Not sold or shared with third parties.</li>
+        </ul>
+        
+        <h4>3) Files You Upload</h4>
+        <p>Your uploaded file is handled only long enough to complete your conversion. Your converted DXF is generated, delivered to you, and then not retained by us.</p>
+        
+        <h4>4) Voluntary Contributions (Stripe)</h4>
+        <p>Payments are processed by Stripe. We do not receive or store your full payment card details. We may receive your email, name, amount, and transaction reference to send thank-you emails.</p>
+        
+        <h4>5) When We Share Information</h4>
+        <p>We do not sell personal information. We may share limited information with service providers (hosting, payment processing) or when required by law.</p>
+        
+        <h4>6) Data Retention</h4>
+        <ul>
+            <li><strong>Uploaded files:</strong> Not retained after processing</li>
+            <li><strong>Email addresses:</strong> Retained until you request deletion</li>
+            <li><strong>Technical logs:</strong> Retained as needed for security</li>
+        </ul>
+        
+        <h4>7) Your Choices</h4>
+        <p>Contact support@bitmaptodxf.com to confirm, correct, or delete your email address.</p>
+        
+        <h4>8) Security</h4>
+        <p>We take reasonable measures to protect information. Please avoid uploading highly sensitive personal data.</p>
+        
+        <h4>9) Changes</h4>
+        <p>We may update this policy and will post changes here with an updated effective date.</p>
+        
+        <h4>10) Contact</h4>
+        <p>DBC International • support@bitmaptodxf.com</p>
+    </div>
+</details>
+""", unsafe_allow_html=True)
+
 # Footer
 st.markdown("""
 <div class="footer">
     <div class="footer-text">
-        Image to DXF Converter • Built with ❤️ for makers<br>
-        <span style="font-size: 0.75rem;">Precision tools for laser marking & CNC machining.</span>
+        bitmaptodxf.com • DBC International • Built with ❤️ for makers<br>
+        <span style="font-size: 0.75rem;">Precision tools for laser marking & CNC machining</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
