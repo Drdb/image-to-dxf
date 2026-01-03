@@ -1182,107 +1182,89 @@ if uploaded_file:
                 )
 
 # Privacy Policy Section
-st.markdown("""
-<style>
-    .privacy-expander {
-        background: linear-gradient(135deg, rgba(100,100,120,0.15) 0%, rgba(100,100,120,0.05) 100%);
-        border: 1px solid rgba(150,150,170,0.3);
-        border-radius: 10px;
-        margin: 2rem 0 1rem 0;
-    }
-    .privacy-expander summary {
-        color: #a0a0b0 !important;
-        font-size: 0.95rem !important;
-        font-weight: 500 !important;
-        padding: 0.7rem 1rem !important;
-        cursor: pointer;
-    }
-    .privacy-expander summary:hover {
-        background: rgba(150,150,170,0.1);
-    }
-    .privacy-content {
-        padding: 1rem 1.5rem;
-        color: #c0c0c8;
-        line-height: 1.7;
-        font-size: 0.85rem;
-        max-height: 400px;
-        overflow-y: auto;
-    }
-    .privacy-content h3 {
-        color: #e8b478;
-        font-size: 1.1rem;
-        margin-top: 0;
-        margin-bottom: 0.5rem;
-    }
-    .privacy-content h4 {
-        color: #d0d0d8;
-        font-size: 0.95rem;
-        margin-top: 1rem;
-        margin-bottom: 0.3rem;
-    }
-    .privacy-content p {
-        margin: 0.4rem 0;
-    }
-    .privacy-content ul {
-        margin: 0.3rem 0 0.3rem 1.2rem;
-        padding: 0;
-    }
-    .privacy-content li {
-        margin-bottom: 0.2rem;
-    }
-</style>
-<details class="privacy-expander">
-    <summary>🔒 Privacy Policy</summary>
-    <div class="privacy-content">
-        <h3>Privacy Policy</h3>
-        <p><strong>Operator:</strong> DBC International ("DBC," "we," "us," "our")<br>
-        <strong>Service:</strong> bitmaptodxf.com<br>
-        <strong>Contact:</strong> support@bitmaptodxf.com<br>
-        <strong>Effective date:</strong> January 1, 2026</p>
-        
-        <p>Your files should not become someone else's data. We designed bitmaptodxf.com so conversions can happen without creating a permanent archive of what you upload.</p>
-        
-        <h4>1) What We Collect</h4>
-        <p><strong>A. Files you upload:</strong> We do not store your uploaded files or converted DXF files. Files are processed transiently in memory and are not retained after conversion.</p>
-        <p><strong>B. Email addresses:</strong> We collect email addresses only when you voluntarily provide them (for support or when you choose to support the project).</p>
-        <p><strong>C. Technical data:</strong> Our infrastructure may collect limited technical information (IP address, browser type, timestamps) for diagnostics and security.</p>
-        
-        <h4>2) How We Use Information</h4>
-        <ul>
-            <li><strong>Uploaded files:</strong> Used only to perform the conversion you request. Not sold, rented, or shared.</li>
-            <li><strong>Email addresses:</strong> Used for support, troubleshooting, and thank-you emails to contributors. Not sold or shared with third parties.</li>
-        </ul>
-        
-        <h4>3) Files You Upload</h4>
-        <p>Your uploaded file is handled only long enough to complete your conversion. Your converted DXF is generated, delivered to you, and then not retained by us.</p>
-        
-        <h4>4) Voluntary Contributions (Stripe)</h4>
-        <p>Payments are processed by Stripe. We do not receive or store your full payment card details. We may receive your email, name, amount, and transaction reference to send thank-you emails.</p>
-        
-        <h4>5) When We Share Information</h4>
-        <p>We do not sell personal information. We may share limited information with service providers (hosting, payment processing) or when required by law.</p>
-        
-        <h4>6) Data Retention</h4>
-        <ul>
-            <li><strong>Uploaded files:</strong> Not retained after processing</li>
-            <li><strong>Email addresses:</strong> Retained until you request deletion</li>
-            <li><strong>Technical logs:</strong> Retained as needed for security</li>
-        </ul>
-        
-        <h4>7) Your Choices</h4>
-        <p>Contact support@bitmaptodxf.com to confirm, correct, or delete your email address.</p>
-        
-        <h4>8) Security</h4>
-        <p>We take reasonable measures to protect information. Please avoid uploading highly sensitive personal data.</p>
-        
-        <h4>9) Changes</h4>
-        <p>We may update this policy and will post changes here with an updated effective date.</p>
-        
-        <h4>10) Contact</h4>
-        <p>DBC International • support@bitmaptodxf.com</p>
-    </div>
-</details>
-""", unsafe_allow_html=True)
+with st.expander("🔒 Privacy Policy"):
+    st.markdown("""
+**Operator:** DBC International ("DBC," "we," "us," "our")  
+**Service:** bitmaptodxf.com  
+**Contact:** support@bitmaptodxf.com  
+**Effective date:** January 1, 2026
+
+Your files should not become someone else's data. We designed bitmaptodxf.com so conversions can happen without creating a permanent archive of what you upload.
+
+---
+
+### 1) What We Collect
+
+**A. Files you upload for conversion**  
+We do not store your uploaded files or your converted DXF files. Files are processed only to generate the output you request and are handled transiently during the conversion process (for example, in memory and temporary runtime handling). After the conversion is complete (or your session ends), we do not retain those files.
+
+**B. Email addresses you submit**  
+We may collect and retain an email address when you voluntarily provide it (for example, for support, troubleshooting, or when you choose to support the project).
+
+**C. Basic technical data**  
+Our infrastructure providers may automatically collect limited technical information, such as: IP address, browser type/device information, timestamps, and diagnostic logs.
+
+---
+
+### 2) How We Use Information
+
+**Uploaded files:** We use uploaded files only to perform the conversion you request. We do not sell, rent, or share uploaded file content for marketing purposes, and we do not retain it after processing.
+
+**Email addresses:** We use retained email addresses for support and troubleshooting, and thank-you emails to users who voluntarily contribute. We do not sell your email address or share it with third parties for marketing.
+
+---
+
+### 3) Files You Upload
+
+Your uploaded file is handled only long enough to complete your conversion request. Your converted DXF is generated and delivered to you, and then not retained by us. If you prefer not to have a file processed online, please do not upload it.
+
+---
+
+### 4) Voluntary Contributions (Stripe)
+
+If you choose to make a voluntary contribution ("buy a coffee"), the payment is processed by Stripe. We do not receive or store your full payment card details. We may receive your email address, name (if provided), contribution amount, and transaction reference for thank-you emails and support.
+
+---
+
+### 5) When We Share Information
+
+We do not sell personal information. We may share limited information only with:
+- **Service providers:** Third-party providers (hosting, payment processing, email delivery) who process data on our behalf
+- **Legal and safety:** When required to comply with law or protect users
+
+---
+
+### 6) Data Retention
+
+- **Uploaded files and converted DXFs:** Not retained after processing
+- **Email addresses:** Retained until you request deletion
+- **Technical logs:** Retained only as needed for security and diagnostics
+
+---
+
+### 7) Your Choices
+
+You can request that we confirm whether we have your email address on file, correct it, or delete it. Contact support@bitmaptodxf.com and we will respond within a reasonable timeframe.
+
+---
+
+### 8) Security
+
+We take reasonable measures to protect the information we handle. However, no system can guarantee absolute security. Please avoid uploading highly sensitive personal data.
+
+---
+
+### 9) Changes to This Policy
+
+We may update this Privacy Policy as the Service evolves. When we do, we will update the Effective Date and post the revised policy here.
+
+---
+
+### 10) Contact
+
+**DBC International**  
+Email: support@bitmaptodxf.com
+    """)
 
 # Footer
 st.markdown("""
