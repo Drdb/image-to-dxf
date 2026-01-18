@@ -674,7 +674,7 @@ def generate_preview(image, mode, threshold, invert, flip_y, line_step, brightne
 # Hero header
 st.markdown("""
 <div class="hero-container">
-    <div class="hero-title">Engraving-ready DXF toolpaths from any image.</div>
+    <div class="hero-title">Convert photos to DXF with true grayscale.</div>
     <div class="hero-subtitle">Generate true grayscale (continuous-tone) engraving using short-segment toolpaths, optimized for laser marking and CNC engraving.</div>
 </div>
 """, unsafe_allow_html=True)
