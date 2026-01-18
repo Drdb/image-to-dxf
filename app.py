@@ -752,7 +752,25 @@ st.markdown("""
     </div>
 </details>
 """, unsafe_allow_html=True)
-
+# Technical explanation section - collapsible
+st.markdown("""
+<details class="help-expander">
+    <summary>🔧 WHY DXF BITMAP? — Technical Details</summary>
+    <div class="help-content">
+        <h4>Why raster engraving isn't always acceptable</h4>
+        <ul>
+            <li><strong>Works in vector-only CNC workflows:</strong> Many CNC, waterjet, plasma, and engraving toolchains don't accept raster images reliably. DXF is the common denominator.</li>
+            <li><strong>Grayscale without "true grayscale":</strong> We convert shading into dot density (diffusion dithering) so the result engraves like a photo even on systems that only understand on/off geometry.</li>
+            <li><strong>More consistent across machines and software:</strong> Raster engraving depends on driver-specific grayscale mapping. A dithered DXF is deterministic geometry, so results are far more repeatable between setups.</li>
+            <li><strong>Predictable job behavior:</strong> Raster time and quality vary with DPI, overscan, and scan settings. Vector/dither DXF scales with actual marked geometry, making runs easier to estimate and standardize.</li>
+            <li><strong>Cleaner appearance than scanlines:</strong> Raster often introduces banding, moiré, and directional artifacts. Dithered vectors avoid scanline patterns and generally look more uniform on finished parts.</li>
+            <li><strong>No need for fast power modulation:</strong> If your machine can't modulate power/frequency smoothly per pixel, raster grayscale degrades. Dither DXF achieves tone with density, using stable marking settings.</li>
+            <li><strong>Better control over detail:</strong> You can tune dot size/spacing to match spot size, kerf, and material response—often preserving edges and small features better than raster.</li>
+            <li><strong>Easier to share and archive:</strong> DXF is a standard CAD/CAM asset—simple to store, version, and hand off without worrying about DPI, color profiles, or driver settings.</li>
+        </ul>
+    </div>
+</details>
+""", unsafe_allow_html=True)
 # Main layout: Settings on left, Images on right
 col_settings, col_images = st.columns([1, 2], gap="large")
 
