@@ -28,6 +28,18 @@ st.set_page_config(
     layout="wide"
 )
 
+# Google Analytics 4 Tracking
+st.markdown("""
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-10Q5FPJ5K7"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-10Q5FPJ5K7');
+</script>
+""", unsafe_allow_html=True)
+
 # Beautiful custom CSS with fixed input text colors
 st.markdown("""
 <style>
@@ -1064,6 +1076,17 @@ if uploaded_file:
                 
                 st.success("✅ Conversion complete!")
                 
+                # Track conversion event in Google Analytics
+                st.markdown(f"""
+                <script>
+                  gtag('event', 'file_converted', {{
+                    'event_category': 'DXF',
+                    'event_label': '{mode}',
+                    'value': 1
+                  }});
+                </script>
+                """, unsafe_allow_html=True)
+                
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
     
@@ -1174,6 +1197,17 @@ if uploaded_file:
                 
                 if unlock_clicked:
                     if customer_email and '@' in customer_email and '.' in customer_email:
+                        
+                        # Track email unlock event in Google Analytics
+                        st.markdown("""
+                        <script>
+                          gtag('event', 'email_unlock', {
+                            'event_category': 'DXF',
+                            'event_label': 'download_unlocked',
+                            'value': 1
+                          });
+                        </script>
+                        """, unsafe_allow_html=True)
                         
                         # Notify owner of new registration (non-blocking)
                         notification_status = notify_new_registration(
