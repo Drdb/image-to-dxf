@@ -4,6 +4,7 @@ A beautifully designed web service for converting bitmap images to DXF format
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image, ImageDraw, ImageFilter, ImageOps, ImageEnhance
 import io
 import base64
@@ -28,17 +29,29 @@ st.set_page_config(
     layout="wide"
 )
 
-# Google Analytics 4 Tracking
-import streamlit.components.v1 as components    components.html("""
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-10Q5FPJ5K7"></script>
+# Google Analytics 4 - inject into parent frame (works with Streamlit iframes)
+components.html("""
 <script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-10Q5FPJ5K7');
+    // Inject GA script into parent document head
+    if (!window.parent.document.querySelector('script[src*="googletagmanager"]')) {
+        var script1 = document.createElement('script');
+        script1.async = true;
+        script1.src = 'https://www.googletagmanager.com/gtag/js?id=G-10Q5FPJ5K7';
+        window.parent.document.head.appendChild(script1);
+        
+        script1.onload = function() {
+            var script2 = document.createElement('script');
+            script2.innerHTML = `
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', 'G-10Q5FPJ5K7');
+            `;
+            window.parent.document.head.appendChild(script2);
+        };
+    }
 </script>
-""", unsafe_allow_html=True)
+""", height=0)
 
 # Beautiful custom CSS with fixed input text colors
 st.markdown("""
@@ -486,7 +499,7 @@ st.markdown("""
         border-radius: 8px !important;
     }
 </style>
-""", height=0)
+""", unsafe_allow_html=True)
 
 # Payment links (Stripe - LIVE)
 PAYMENT_LINKS = {
@@ -1077,15 +1090,17 @@ if uploaded_file:
                 st.success("✅ Conversion complete!")
                 
                 # Track conversion event in Google Analytics
-                st.markdown(f"""
+                components.html(f"""
                 <script>
-                  gtag('event', 'file_converted', {{
-                    'event_category': 'DXF',
-                    'event_label': '{mode}',
-                    'value': 1
-                  }});
+                    if (window.parent.gtag) {{
+                        window.parent.gtag('event', 'file_converted', {{
+                            'event_category': 'DXF',
+                            'event_label': '{mode}',
+                            'value': 1
+                        }});
+                    }}
                 </script>
-                """, unsafe_allow_html=True)
+                """, height=0)
                 
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
@@ -1199,15 +1214,17 @@ if uploaded_file:
                     if customer_email and '@' in customer_email and '.' in customer_email:
                         
                         # Track email unlock event in Google Analytics
-                        st.markdown("""
+                        components.html("""
                         <script>
-                          gtag('event', 'email_unlock', {
-                            'event_category': 'DXF',
-                            'event_label': 'download_unlocked',
-                            'value': 1
-                          });
+                            if (window.parent.gtag) {
+                                window.parent.gtag('event', 'email_unlock', {
+                                    'event_category': 'DXF',
+                                    'event_label': 'download_unlocked',
+                                    'value': 1
+                                });
+                            }
                         </script>
-                        """, unsafe_allow_html=True)
+                        """, height=0)
                         
                         # Notify owner of new registration (non-blocking)
                         notification_status = notify_new_registration(
