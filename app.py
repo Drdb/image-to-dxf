@@ -29,7 +29,7 @@ st.set_page_config(
 )
 
 # Google Analytics 4 Tracking
-st.markdown("""
+import streamlit.components.v1 as components    components.html("""
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-10Q5FPJ5K7"></script>
 <script>
@@ -486,7 +486,7 @@ st.markdown("""
         border-radius: 8px !important;
     }
 </style>
-""", unsafe_allow_html=True)
+""", height=0)
 
 # Payment links (Stripe - LIVE)
 PAYMENT_LINKS = {
