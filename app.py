@@ -10,7 +10,6 @@ import base64
 import math
 import requests
 import uuid
-import json
 import os
 from datetime import datetime, timedelta
 from converter import BitmapToDXFConverter
@@ -19,56 +18,74 @@ from converter import BitmapToDXFConverter
 GA4_MEASUREMENT_ID = "G-10Q5FPJ5K7"
 GA4_API_SECRET = "eqWSLlxrTeO6IkN_r5fyKg"
 
-# Stats file for persistent tracking
-STATS_FILE = "/tmp/dxf_stats.json"
+# Supabase configuration
+SUPABASE_URL = "https://jsltfgyidovmzgmvnlii.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzbHRmZ3lpZG92bXpnbXZubGlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyNzIyNzQsImV4cCI6MjA4Njg0ODI3NH0._IW_SPo72CD5S5EqAuOcYPOSfkrCQXADeWSgUhXFjXw"
 
-def load_stats():
-    """Load conversion stats from file"""
+def supabase_insert(table, data):
+    """Insert a row into Supabase table"""
     try:
-        if os.path.exists(STATS_FILE):
-            with open(STATS_FILE, 'r') as f:
-                return json.load(f)
+        resp = requests.post(
+            f"{SUPABASE_URL}/rest/v1/{table}",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal"
+            },
+            json=data,
+            timeout=10
+        )
+        return resp.status_code in [200, 201]
     except:
-        pass
-    return {
-        "total_conversions": 0,
-        "total_downloads": 0,
-        "conversions_30d": [],
-        "downloads_30d": [],
-        "start_date": datetime.now().isoformat()
+        return False
+
+def supabase_count(table, since=None):
+    """Count rows in Supabase table, optionally filtered by date"""
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/{table}?select=id"
+        if since:
+            url += f"&created_at=gte.{since}"
+        
+        resp = requests.get(
+            url,
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Prefer": "count=exact"
+            },
+            timeout=10
+        )
+        # Count is in the Content-Range header
+        content_range = resp.headers.get("Content-Range", "")
+        if "/" in content_range:
+            return int(content_range.split("/")[1])
+        return len(resp.json())
+    except:
+        return 0
+
+def record_conversion(mode, filename=None, customer_email=None):
+    """Record a conversion event to Supabase"""
+    data = {
+        "mode": mode,
+        "filename": filename,
+        "customer_email": customer_email
     }
+    return supabase_insert("conversions", data)
 
-def save_stats(stats):
-    """Save conversion stats to file"""
-    try:
-        with open(STATS_FILE, 'w') as f:
-            json.dump(stats, f)
-    except:
-        pass
-
-def record_conversion(mode):
-    """Record a conversion event"""
-    stats = load_stats()
-    stats["total_conversions"] += 1
-    now = datetime.now().isoformat()
-    stats["conversions_30d"].append({"time": now, "mode": mode})
-    # Keep only last 30 days
-    cutoff = (datetime.now() - timedelta(days=30)).isoformat()
-    stats["conversions_30d"] = [c for c in stats["conversions_30d"] if c["time"] > cutoff]
-    save_stats(stats)
-    return stats
-
-def record_download():
-    """Record a download event"""
-    stats = load_stats()
-    stats["total_downloads"] += 1
-    now = datetime.now().isoformat()
-    stats["downloads_30d"].append({"time": now})
-    # Keep only last 30 days
-    cutoff = (datetime.now() - timedelta(days=30)).isoformat()
-    stats["downloads_30d"] = [d for d in stats["downloads_30d"] if d["time"] > cutoff]
-    save_stats(stats)
-    return stats
+def get_stats():
+    """Get conversion statistics from Supabase"""
+    now = datetime.utcnow()
+    
+    # Calculate cutoff times
+    cutoff_24h = (now - timedelta(hours=24)).isoformat() + "Z"
+    cutoff_30d = (now - timedelta(days=30)).isoformat() + "Z"
+    
+    return {
+        "total_conversions": supabase_count("conversions"),
+        "conversions_30d": supabase_count("conversions", cutoff_30d),
+        "conversions_24h": supabase_count("conversions", cutoff_24h),
+    }
 
 def track_ga4_event(event_name, params=None):
     """Send event to Google Analytics 4 via Measurement Protocol"""
@@ -106,17 +123,11 @@ def send_conversion_alert(mode, filename, customer_email=None):
         test_recipient = (os.environ.get("RESEND_TEST_RECIPIENT") or "db.benderly@gmail.com").strip()
         owner_emails = [test_recipient]
     
-    # Get current stats
-    stats = load_stats()
+    # Get current stats from Supabase
+    stats = get_stats()
     total_conversions = stats["total_conversions"]
-    conversions_30d = len(stats["conversions_30d"])
-    total_downloads = stats["total_downloads"]
-    downloads_30d = len(stats["downloads_30d"])
-    
-    # Calculate 24h stats
-    cutoff_24h = (datetime.now() - timedelta(hours=24)).isoformat()
-    conversions_24h = len([c for c in stats["conversions_30d"] if c["time"] > cutoff_24h])
-    downloads_24h = len([d for d in stats["downloads_30d"] if d["time"] > cutoff_24h])
+    conversions_30d = stats["conversions_30d"]
+    conversions_24h = stats["conversions_24h"]
     
     # Build email
     customer_info = f"<p><strong>Customer Email:</strong> {customer_email}</p>" if customer_email else ""
@@ -129,33 +140,31 @@ def send_conversion_alert(mode, filename, customer_email=None):
             <p><strong>Mode:</strong> {mode}</p>
             <p><strong>File:</strong> {filename}</p>
             {customer_info}
-            <p><strong>Time:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC</p>
+            <p><strong>Time:</strong> {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC</p>
         </div>
         
-        <h3 style="color: #333;">📊 Statistics</h3>
+        <h3 style="color: #333;">📊 Conversion Statistics</h3>
         <table style="width: 100%; border-collapse: collapse;">
             <tr style="background: #e8b478; color: white;">
-                <th style="padding: 10px; text-align: left;">Metric</th>
-                <th style="padding: 10px; text-align: center;">Last 24h</th>
-                <th style="padding: 10px; text-align: center;">Last 30 days</th>
-                <th style="padding: 10px; text-align: center;">All Time</th>
+                <th style="padding: 10px; text-align: left;">Time Period</th>
+                <th style="padding: 10px; text-align: center;">Conversions</th>
             </tr>
             <tr style="background: #fff;">
-                <td style="padding: 10px; border-bottom: 1px solid #ddd;">Conversions</td>
+                <td style="padding: 10px; border-bottom: 1px solid #ddd;">Last 24 hours</td>
                 <td style="padding: 10px; text-align: center; border-bottom: 1px solid #ddd;">{conversions_24h}</td>
-                <td style="padding: 10px; text-align: center; border-bottom: 1px solid #ddd;">{conversions_30d}</td>
-                <td style="padding: 10px; text-align: center; border-bottom: 1px solid #ddd;"><strong>{total_conversions}</strong></td>
             </tr>
             <tr style="background: #f9f9f9;">
-                <td style="padding: 10px; border-bottom: 1px solid #ddd;">Email Unlocks</td>
-                <td style="padding: 10px; text-align: center; border-bottom: 1px solid #ddd;">{downloads_24h}</td>
-                <td style="padding: 10px; text-align: center; border-bottom: 1px solid #ddd;">{downloads_30d}</td>
-                <td style="padding: 10px; text-align: center; border-bottom: 1px solid #ddd;"><strong>{total_downloads}</strong></td>
+                <td style="padding: 10px; border-bottom: 1px solid #ddd;">Last 30 days</td>
+                <td style="padding: 10px; text-align: center; border-bottom: 1px solid #ddd;">{conversions_30d}</td>
+            </tr>
+            <tr style="background: #fff;">
+                <td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>All Time Total</strong></td>
+                <td style="padding: 10px; text-align: center; border-bottom: 1px solid #ddd; font-size: 18px;"><strong>{total_conversions}</strong></td>
             </tr>
         </table>
         
         <p style="color: #888; font-size: 12px; margin-top: 20px;">
-            Stats tracked since deployment. For visitor data, check Cloudflare Analytics.
+            📈 For visitor analytics, check <a href="https://dash.cloudflare.com">Cloudflare Analytics</a>
         </p>
     </div>
     """
@@ -163,7 +172,7 @@ def send_conversion_alert(mode, filename, customer_email=None):
     payload = {
         "from": from_email,
         "to": owner_emails,
-        "subject": f"🎯 DXF Conversion: {mode} | Total: {total_conversions}",
+        "subject": f"🎯 DXF Conversion #{total_conversions}: {mode}",
         "html": html_content,
     }
     
@@ -1242,7 +1251,7 @@ if uploaded_file:
                 
                 # Track conversion
                 track_ga4_event('file_converted', {'conversion_mode': mode})
-                record_conversion(mode)
+                record_conversion(mode, uploaded_file.name)
                 
                 # Send email alert (non-blocking)
                 send_conversion_alert(mode, uploaded_file.name)
@@ -1362,7 +1371,6 @@ if uploaded_file:
                         
                         # Track email unlock
                         track_ga4_event('email_unlock', {'action': 'download_unlocked'})
-                        record_download()
                         
                         # Notify owner of new registration (non-blocking)
                         notification_status = notify_new_registration(
