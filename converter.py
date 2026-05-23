@@ -3,7 +3,7 @@ Bitmap to DXF Converter - Core Engine
 Converts bitmap images to DXF format with multiple modes:
 - Threshold (lines)
 - Floyd-Steinberg Dithering (dots)
-- Outline (contours)
+- Outline (contours) - with improved sub-pixel interpolation and curvature-adaptive simplification
 """
 
 from PIL import Image
@@ -47,7 +47,7 @@ class BitmapToDXFConverter:
             flip_y: Flip Y axis for CAD orientation
             bidirectional: Use zigzag scanning
             outline_levels: Number of grayscale levels for outline mode
-            smoothing_amount: Smoothing for outline mode
+            smoothing_amount: Smoothing/simplification for outline mode (higher = fewer nodes)
             corner_threshold: Corner detection angle for outline mode
             
         Returns:
@@ -132,10 +132,8 @@ class BitmapToDXFConverter:
                         entity_count += 1
                         
         elif mode == "outline":
-            # Outline mode: trace contours
+            # Improved outline mode with sub-pixel interpolation
             num_levels = outline_levels
-            smoothing = smoothing_amount
-            corner_angle = corner_threshold
             
             if invert:
                 img = Image.eval(img, lambda x: 255 - x)
@@ -149,25 +147,26 @@ class BitmapToDXFConverter:
                 thresholds = [step * i for i in range(1, num_levels)]
             
             for thresh in thresholds:
-                edges = self._find_contours_marching_squares(img, thresh)
+                # Use improved sub-pixel marching squares
+                edges = self._find_contours_subpixel(img, thresh)
                 polylines = self._trace_contours(edges)
                 
                 processed = []
                 for poly in polylines:
                     if len(poly) >= 2:
-                        if smoothing > 0:
-                            smoothed = self._smooth_contour(poly, smoothing, corner_angle)
-                        else:
-                            smoothed = poly
+                        # Apply anti-staircase smoothing first
+                        smoothed = self._smooth_staircase(poly, smoothing_amount)
                         
-                        simp = self._simplify_polyline(smoothed, smoothing * 0.5 + 0.5)
-                        if len(simp) >= 2:
-                            processed.append(simp)
+                        # Then apply curvature-adaptive simplification
+                        simplified = self._simplify_adaptive(smoothed, smoothing_amount, corner_threshold)
+                        
+                        if len(simplified) >= 2:
+                            processed.append(simplified)
                 
                 all_polylines.extend(processed)
             
             # Optimize path
-            connection_tolerance = max(2.0, smoothing)
+            connection_tolerance = max(2.0, smoothing_amount)
             optimized = self._optimize_outline_path(all_polylines, connection_tolerance)
             
             # Write polylines as LINE segments
@@ -285,29 +284,58 @@ class BitmapToDXFConverter:
         result.putdata(result_data)
         return result
     
-    def _find_contours_marching_squares(self, img, threshold):
-        """Find contour edges using marching squares algorithm."""
+    def _find_contours_subpixel(self, img, threshold):
+        """
+        Find contour edges using marching squares with sub-pixel interpolation.
+        This produces smooth edges by interpolating the exact position based on pixel values.
+        """
         w, h = img.size
         px = img.load()
         edges = []
         
+        def interpolate(v1, v2, t):
+            """Interpolate position between two pixels based on threshold."""
+            if v1 == v2:
+                return 0.5
+            return (t - v1) / (v2 - v1)
+        
         for y in range(h - 1):
             for x in range(w - 1):
-                tl = 1 if px[x, y] >= threshold else 0
-                tr = 1 if px[x + 1, y] >= threshold else 0
-                br = 1 if px[x + 1, y + 1] >= threshold else 0
-                bl = 1 if px[x, y + 1] >= threshold else 0
+                # Get pixel values
+                val_tl = px[x, y]
+                val_tr = px[x + 1, y]
+                val_br = px[x + 1, y + 1]
+                val_bl = px[x, y + 1]
+                
+                # Determine which corners are above threshold
+                tl = 1 if val_tl >= threshold else 0
+                tr = 1 if val_tr >= threshold else 0
+                br = 1 if val_br >= threshold else 0
+                bl = 1 if val_bl >= threshold else 0
                 
                 cell = tl * 8 + tr * 4 + br * 2 + bl * 1
                 
                 if cell == 0 or cell == 15:
                     continue
                 
-                top = (x + 0.5, y)
-                right = (x + 1, y + 0.5)
-                bottom = (x + 0.5, y + 1)
-                left = (x, y + 0.5)
+                # Calculate interpolated edge positions
+                # Top edge (between tl and tr)
+                t_top = interpolate(val_tl, val_tr, threshold)
+                top = (x + t_top, y)
                 
+                # Right edge (between tr and br)
+                t_right = interpolate(val_tr, val_br, threshold)
+                right = (x + 1, y + t_right)
+                
+                # Bottom edge (between bl and br)
+                t_bottom = interpolate(val_bl, val_br, threshold)
+                bottom = (x + t_bottom, y + 1)
+                
+                # Left edge (between tl and bl)
+                t_left = interpolate(val_tl, val_bl, threshold)
+                left = (x, y + t_left)
+                
+                # Generate edges based on cell configuration
                 if cell == 1 or cell == 14:
                     edges.append((left, bottom))
                 elif cell == 2 or cell == 13:
@@ -334,14 +362,20 @@ class BitmapToDXFConverter:
         if not edges:
             return []
         
+        # Build adjacency with tolerance for floating point coordinates
+        def round_point(p, decimals=4):
+            return (round(p[0], decimals), round(p[1], decimals))
+        
         adjacency = {}
         for (p1, p2) in edges:
-            if p1 not in adjacency:
-                adjacency[p1] = []
-            if p2 not in adjacency:
-                adjacency[p2] = []
-            adjacency[p1].append(p2)
-            adjacency[p2].append(p1)
+            rp1 = round_point(p1)
+            rp2 = round_point(p2)
+            if rp1 not in adjacency:
+                adjacency[rp1] = []
+            if rp2 not in adjacency:
+                adjacency[rp2] = []
+            adjacency[rp1].append((rp2, p1, p2))
+            adjacency[rp2].append((rp1, p2, p1))
         
         used_edges = set()
         polylines = []
@@ -350,22 +384,24 @@ class BitmapToDXFConverter:
             return tuple(sorted([p1, p2]))
         
         for start_point in adjacency:
-            for next_point in adjacency[start_point]:
+            for next_info in adjacency[start_point]:
+                next_point, orig_start, orig_next = next_info
                 ek = edge_key(start_point, next_point)
                 if ek in used_edges:
                     continue
                 
-                polyline = [start_point, next_point]
+                polyline = [orig_start, orig_next]
                 used_edges.add(ek)
                 
                 current = next_point
                 while True:
                     found_next = False
-                    for neighbor in adjacency.get(current, []):
+                    for neighbor_info in adjacency.get(current, []):
+                        neighbor, _, orig_neighbor = neighbor_info
                         ek = edge_key(current, neighbor)
                         if ek not in used_edges:
                             used_edges.add(ek)
-                            polyline.append(neighbor)
+                            polyline.append(orig_neighbor)
                             current = neighbor
                             found_next = True
                             break
@@ -375,11 +411,12 @@ class BitmapToDXFConverter:
                 current = start_point
                 while True:
                     found_next = False
-                    for neighbor in adjacency.get(current, []):
+                    for neighbor_info in adjacency.get(current, []):
+                        neighbor, orig_neighbor, _ = neighbor_info
                         ek = edge_key(current, neighbor)
                         if ek not in used_edges:
                             used_edges.add(ek)
-                            polyline.insert(0, neighbor)
+                            polyline.insert(0, orig_neighbor)
                             current = neighbor
                             found_next = True
                             break
@@ -391,61 +428,225 @@ class BitmapToDXFConverter:
         
         return polylines
     
-    def _simplify_polyline(self, points, tolerance):
-        """Douglas-Peucker polyline simplification."""
-        if len(points) <= 2:
+    def _smooth_staircase(self, points, smoothing_amount):
+        """
+        Remove staircase artifacts from contour while preserving overall shape.
+        Uses a moving average filter that's aware of the local direction.
+        """
+        if len(points) < 5 or smoothing_amount <= 0:
             return points
         
-        is_closed = (points[0] == points[-1])
+        # Determine window size based on smoothing amount
+        window = max(3, min(9, int(smoothing_amount * 2) + 1))
+        if window % 2 == 0:
+            window += 1
+        half_window = window // 2
         
-        if is_closed and len(points) <= 4:
-            return points
+        is_closed = self._points_equal(points[0], points[-1])
+        n = len(points) - 1 if is_closed else len(points)
+        
+        smoothed = []
+        
+        for i in range(n):
+            # Collect points in window
+            window_points = []
+            for j in range(-half_window, half_window + 1):
+                if is_closed:
+                    idx = (i + j) % n
+                else:
+                    idx = max(0, min(n - 1, i + j))
+                window_points.append(points[idx])
+            
+            # Calculate local curvature to decide smoothing strength
+            if len(window_points) >= 3:
+                curvature = self._estimate_curvature(window_points)
+                # Less smoothing on high curvature areas (curves), more on low curvature (staircases)
+                adaptive_weight = 1.0 / (1.0 + curvature * 10)
+            else:
+                adaptive_weight = 1.0
+            
+            # Weighted average - original point gets more weight on curves
+            orig_weight = 1.0 - adaptive_weight * 0.7
+            avg_x = sum(p[0] for p in window_points) / len(window_points)
+            avg_y = sum(p[1] for p in window_points) / len(window_points)
+            
+            new_x = points[i][0] * orig_weight + avg_x * (1 - orig_weight)
+            new_y = points[i][1] * orig_weight + avg_y * (1 - orig_weight)
+            
+            smoothed.append((new_x, new_y))
         
         if is_closed:
-            max_dist = 0
-            split_idx = 1
-            
-            for i in range(1, len(points) - 1):
-                prev_pt = points[i - 1]
-                next_pt = points[(i + 1) % (len(points) - 1)]
-                dist = self._point_line_distance(points[i], prev_pt, next_pt)
-                if dist > max_dist:
-                    max_dist = dist
-                    split_idx = i
-            
-            reordered = points[split_idx:-1] + points[:split_idx + 1]
-            simplified = self._simplify_open(reordered, tolerance)
-            
-            if simplified[0] != simplified[-1]:
-                simplified.append(simplified[0])
-            
-            return simplified
-        else:
-            return self._simplify_open(points, tolerance)
+            smoothed.append(smoothed[0])
+        
+        return smoothed
     
-    def _simplify_open(self, points, tolerance):
-        """Douglas-Peucker simplification for open polylines."""
+    def _estimate_curvature(self, points):
+        """Estimate local curvature from a set of points."""
+        if len(points) < 3:
+            return 0
+        
+        # Use the middle three points
+        mid = len(points) // 2
+        p1 = points[max(0, mid - 1)]
+        p2 = points[mid]
+        p3 = points[min(len(points) - 1, mid + 1)]
+        
+        # Calculate vectors
+        v1 = (p2[0] - p1[0], p2[1] - p1[1])
+        v2 = (p3[0] - p2[0], p3[1] - p2[1])
+        
+        len1 = math.sqrt(v1[0]**2 + v1[1]**2)
+        len2 = math.sqrt(v2[0]**2 + v2[1]**2)
+        
+        if len1 < 0.001 or len2 < 0.001:
+            return 0
+        
+        # Cross product gives sine of angle
+        cross = v1[0] * v2[1] - v1[1] * v2[0]
+        
+        # Normalize by segment lengths
+        curvature = abs(cross) / (len1 * len2)
+        
+        return curvature
+    
+    def _simplify_adaptive(self, points, smoothing_amount, corner_threshold):
+        """
+        Curvature-adaptive simplification.
+        Uses smaller tolerance on curves (preserves detail) and larger on straight lines (fewer nodes).
+        """
         if len(points) <= 2:
             return points
         
-        first = points[0]
-        last = points[-1]
+        is_closed = self._points_equal(points[0], points[-1])
         
-        max_dist = 0
-        max_idx = 0
+        # Base tolerance scales with smoothing amount
+        # Higher smoothing = more simplification = fewer nodes
+        base_tolerance = 0.3 + smoothing_amount * 0.2
+        
+        # First, detect corners (sharp turns) that should always be preserved
+        corners = self._detect_corners(points, corner_threshold)
+        corner_set = set(corners)
+        
+        # Add start/end points to preserved set
+        corner_set.add(0)
+        corner_set.add(len(points) - 1)
+        
+        # Calculate curvature at each point
+        curvatures = self._calculate_all_curvatures(points)
+        
+        # Adaptive simplification
+        result = [points[0]]
+        last_added = 0
         
         for i in range(1, len(points) - 1):
-            dist = self._point_line_distance(points[i], first, last)
-            if dist > max_dist:
-                max_dist = dist
-                max_idx = i
+            # Always keep corners
+            if i in corner_set:
+                result.append(points[i])
+                last_added = i
+                continue
+            
+            # Calculate local curvature (average of nearby points)
+            local_curvature = curvatures[i]
+            
+            # Adaptive tolerance: small on curves, large on straight lines
+            # High curvature = small tolerance = keep more points
+            # Low curvature = large tolerance = remove more points
+            adaptive_tolerance = base_tolerance / (1.0 + local_curvature * 20)
+            adaptive_tolerance = max(0.1, min(base_tolerance * 3, adaptive_tolerance))
+            
+            # Check if this point deviates enough from the line between last added and next corner
+            # Find next corner or end
+            next_anchor = len(points) - 1
+            for j in range(i + 1, len(points)):
+                if j in corner_set:
+                    next_anchor = j
+                    break
+            
+            # Calculate distance from line
+            dist = self._point_line_distance(points[i], points[last_added], points[next_anchor])
+            
+            # Also consider distance traveled - don't skip too many points
+            segment_length = self._distance(points[last_added], points[i])
+            
+            # Keep point if it deviates enough OR we've traveled far enough
+            max_segment = 5.0 + (10.0 / (1.0 + local_curvature * 10))  # Shorter segments on curves
+            
+            if dist > adaptive_tolerance or segment_length > max_segment:
+                result.append(points[i])
+                last_added = i
         
-        if max_dist > tolerance:
-            left = self._simplify_open(points[:max_idx + 1], tolerance)
-            right = self._simplify_open(points[max_idx:], tolerance)
-            return left[:-1] + right
-        else:
-            return [first, last]
+        result.append(points[-1])
+        
+        # Close if original was closed
+        if is_closed and not self._points_equal(result[0], result[-1]):
+            result.append(result[0])
+        
+        return result
+    
+    def _calculate_all_curvatures(self, points):
+        """Calculate curvature at each point."""
+        n = len(points)
+        curvatures = [0.0] * n
+        
+        for i in range(1, n - 1):
+            p1 = points[i - 1]
+            p2 = points[i]
+            p3 = points[i + 1]
+            
+            v1 = (p2[0] - p1[0], p2[1] - p1[1])
+            v2 = (p3[0] - p2[0], p3[1] - p2[1])
+            
+            len1 = math.sqrt(v1[0]**2 + v1[1]**2)
+            len2 = math.sqrt(v2[0]**2 + v2[1]**2)
+            
+            if len1 > 0.001 and len2 > 0.001:
+                cross = abs(v1[0] * v2[1] - v1[1] * v2[0])
+                curvatures[i] = cross / (len1 * len2)
+        
+        return curvatures
+    
+    def _detect_corners(self, points, angle_threshold):
+        """Find indices of corner points (sharp turns)."""
+        if len(points) < 3:
+            return []
+        
+        corners = []
+        is_closed = self._points_equal(points[0], points[-1])
+        n = len(points) - 1 if is_closed else len(points)
+        
+        for i in range(1, n):
+            if is_closed:
+                p1 = points[(i - 1) % n]
+                p2 = points[i % n]
+                p3 = points[(i + 1) % n]
+            else:
+                if i == 0 or i == len(points) - 1:
+                    continue
+                p1 = points[i - 1]
+                p2 = points[i]
+                p3 = points[i + 1]
+            
+            angle = self._calculate_angle(p1, p2, p3)
+            if angle < 180 - angle_threshold:
+                corners.append(i)
+        
+        return corners
+    
+    def _calculate_angle(self, p1, p2, p3):
+        """Calculate the angle at p2 formed by p1-p2-p3."""
+        v1 = (p1[0] - p2[0], p1[1] - p2[1])
+        v2 = (p3[0] - p2[0], p3[1] - p2[1])
+        
+        len1 = math.sqrt(v1[0]**2 + v1[1]**2)
+        len2 = math.sqrt(v2[0]**2 + v2[1]**2)
+        
+        if len1 == 0 or len2 == 0:
+            return 180.0
+        
+        dot = v1[0]*v2[0] + v1[1]*v2[1]
+        cos_angle = max(-1, min(1, dot / (len1 * len2)))
+        
+        return math.degrees(math.acos(cos_angle))
     
     def _point_line_distance(self, point, line_start, line_end):
         """Calculate perpendicular distance from point to line segment."""
@@ -466,151 +667,13 @@ class BitmapToDXFConverter:
         
         return math.sqrt((x - proj_x)**2 + (y - proj_y)**2)
     
-    def _calculate_angle(self, p1, p2, p3):
-        """Calculate the angle at p2 formed by p1-p2-p3."""
-        v1 = (p1[0] - p2[0], p1[1] - p2[1])
-        v2 = (p3[0] - p2[0], p3[1] - p2[1])
-        
-        len1 = math.sqrt(v1[0]**2 + v1[1]**2)
-        len2 = math.sqrt(v2[0]**2 + v2[1]**2)
-        
-        if len1 == 0 or len2 == 0:
-            return 180.0
-        
-        dot = v1[0]*v2[0] + v1[1]*v2[1]
-        cos_angle = max(-1, min(1, dot / (len1 * len2)))
-        
-        return math.degrees(math.acos(cos_angle))
+    def _distance(self, p1, p2):
+        """Calculate distance between two points."""
+        return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
     
-    def _detect_corners(self, points, angle_threshold):
-        """Find indices of corner points."""
-        if len(points) < 3:
-            return []
-        
-        corners = []
-        is_closed = (points[0] == points[-1])
-        n = len(points) - 1 if is_closed else len(points)
-        
-        for i in range(1, n):
-            if is_closed:
-                p1 = points[(i - 1) % n]
-                p2 = points[i % n]
-                p3 = points[(i + 1) % n]
-            else:
-                if i == 0 or i == len(points) - 1:
-                    continue
-                p1 = points[i - 1]
-                p2 = points[i]
-                p3 = points[i + 1]
-            
-            angle = self._calculate_angle(p1, p2, p3)
-            
-            if angle < angle_threshold:
-                corners.append(i)
-        
-        return corners
-    
-    def _gaussian_weight(self, distance, sigma):
-        """Calculate Gaussian weight."""
-        if sigma <= 0:
-            return 1.0 if distance == 0 else 0.0
-        return math.exp(-(distance**2) / (2 * sigma**2))
-    
-    def _smooth_segment(self, points, sigma):
-        """Apply Gaussian smoothing to a segment."""
-        if len(points) <= 2 or sigma <= 0:
-            return points
-        
-        smoothed = []
-        window = int(sigma * 3)
-        
-        for i in range(len(points)):
-            sum_x = 0
-            sum_y = 0
-            sum_weight = 0
-            
-            for j in range(max(0, i - window), min(len(points), i + window + 1)):
-                weight = self._gaussian_weight(abs(j - i), sigma)
-                sum_x += points[j][0] * weight
-                sum_y += points[j][1] * weight
-                sum_weight += weight
-            
-            if sum_weight > 0:
-                smoothed.append((sum_x / sum_weight, sum_y / sum_weight))
-            else:
-                smoothed.append(points[i])
-        
-        return smoothed
-    
-    def _smooth_contour(self, points, smoothing_pixels, corner_angle_threshold):
-        """Smooth a contour while preserving sharp corners."""
-        if len(points) < 3 or smoothing_pixels <= 0:
-            return points
-        
-        is_closed = (points[0] == points[-1])
-        corners = self._detect_corners(points, corner_angle_threshold)
-        
-        if not corners:
-            if is_closed:
-                extended = points[:-1] + points[:-1] + points[:-1]
-                n = len(points) - 1
-                smoothed_ext = self._smooth_segment(extended, smoothing_pixels)
-                smoothed = smoothed_ext[n:2*n]
-                smoothed.append(smoothed[0])
-                return smoothed
-            else:
-                return self._smooth_segment(points, smoothing_pixels)
-        
-        if is_closed:
-            all_corners = sorted(set(corners))
-        else:
-            all_corners = sorted(set([0] + corners + [len(points) - 1]))
-        
-        smoothed_points = []
-        
-        if is_closed:
-            n_corners = len(all_corners)
-            for i in range(n_corners):
-                start_idx = all_corners[i]
-                end_idx = all_corners[(i + 1) % n_corners]
-                
-                if end_idx > start_idx:
-                    segment = points[start_idx:end_idx + 1]
-                else:
-                    segment = points[start_idx:-1] + points[:end_idx + 1]
-                
-                if len(segment) > 2:
-                    middle = self._smooth_segment(segment, smoothing_pixels)
-                    middle[0] = segment[0]
-                    middle[-1] = segment[-1]
-                    smoothed_points.extend(middle[:-1])
-                else:
-                    smoothed_points.extend(segment[:-1])
-            
-            smoothed_points.append(smoothed_points[0])
-        else:
-            for i in range(len(all_corners) - 1):
-                start_idx = all_corners[i]
-                end_idx = all_corners[i + 1]
-                
-                segment = points[start_idx:end_idx + 1]
-                
-                if len(segment) > 2:
-                    middle = self._smooth_segment(segment, smoothing_pixels)
-                    middle[0] = segment[0]
-                    middle[-1] = segment[-1]
-                    
-                    if i == 0:
-                        smoothed_points.extend(middle)
-                    else:
-                        smoothed_points.extend(middle[1:])
-                else:
-                    if i == 0:
-                        smoothed_points.extend(segment)
-                    else:
-                        smoothed_points.extend(segment[1:])
-        
-        return smoothed_points
+    def _points_equal(self, p1, p2, tolerance=0.001):
+        """Check if two points are equal within tolerance."""
+        return abs(p1[0] - p2[0]) < tolerance and abs(p1[1] - p2[1]) < tolerance
     
     def _optimize_outline_path(self, polylines, connection_tolerance=2.0):
         """Optimize outline path for continuous laser travel."""
