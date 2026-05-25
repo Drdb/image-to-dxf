@@ -431,13 +431,13 @@ class BitmapToDXFConverter:
     def _smooth_staircase(self, points, smoothing_amount):
         """
         Remove staircase artifacts from contour while preserving overall shape.
-        Uses a moving average filter that's aware of the local direction.
+        Higher smoothing = more aggressive staircase removal.
         """
         if len(points) < 5 or smoothing_amount <= 0:
             return points
         
-        # Determine window size based on smoothing amount
-        window = max(3, min(9, int(smoothing_amount * 2) + 1))
+        # Window size scales with smoothing amount
+        window = max(3, min(15, int(smoothing_amount) + 3))
         if window % 2 == 0:
             window += 1
         half_window = window // 2
@@ -445,40 +445,54 @@ class BitmapToDXFConverter:
         is_closed = self._points_equal(points[0], points[-1])
         n = len(points) - 1 if is_closed else len(points)
         
-        smoothed = []
+        # Multiple smoothing passes for higher smoothing values
+        num_passes = max(1, min(3, int(smoothing_amount / 10) + 1))
         
-        for i in range(n):
-            # Collect points in window
-            window_points = []
-            for j in range(-half_window, half_window + 1):
-                if is_closed:
-                    idx = (i + j) % n
+        current_points = points
+        
+        for pass_num in range(num_passes):
+            smoothed = []
+            n = len(current_points) - 1 if is_closed else len(current_points)
+            
+            for i in range(n):
+                # Collect points in window
+                window_points = []
+                for j in range(-half_window, half_window + 1):
+                    if is_closed:
+                        idx = (i + j) % n
+                    else:
+                        idx = max(0, min(n - 1, i + j))
+                    window_points.append(current_points[idx])
+                
+                # Calculate local curvature
+                if len(window_points) >= 3:
+                    curvature = self._estimate_curvature(window_points)
+                    # Less smoothing on high curvature (preserve curves)
+                    # More smoothing on low curvature (fix staircases)
+                    adaptive_weight = 1.0 / (1.0 + curvature * 5)
                 else:
-                    idx = max(0, min(n - 1, i + j))
-                window_points.append(points[idx])
+                    adaptive_weight = 1.0
+                
+                # Weighted average
+                smooth_strength = min(0.9, 0.5 + smoothing_amount * 0.02)
+                orig_weight = 1.0 - adaptive_weight * smooth_strength
+                
+                avg_x = sum(p[0] for p in window_points) / len(window_points)
+                avg_y = sum(p[1] for p in window_points) / len(window_points)
+                
+                new_x = current_points[i][0] * orig_weight + avg_x * (1 - orig_weight)
+                new_y = current_points[i][1] * orig_weight + avg_y * (1 - orig_weight)
+                
+                smoothed.append((new_x, new_y))
             
-            # Calculate local curvature to decide smoothing strength
-            if len(window_points) >= 3:
-                curvature = self._estimate_curvature(window_points)
-                # Less smoothing on high curvature areas (curves), more on low curvature (staircases)
-                adaptive_weight = 1.0 / (1.0 + curvature * 10)
+            if is_closed:
+                smoothed.append(smoothed[0])
             else:
-                adaptive_weight = 1.0
+                smoothed.append(current_points[-1])
             
-            # Weighted average - original point gets more weight on curves
-            orig_weight = 1.0 - adaptive_weight * 0.7
-            avg_x = sum(p[0] for p in window_points) / len(window_points)
-            avg_y = sum(p[1] for p in window_points) / len(window_points)
-            
-            new_x = points[i][0] * orig_weight + avg_x * (1 - orig_weight)
-            new_y = points[i][1] * orig_weight + avg_y * (1 - orig_weight)
-            
-            smoothed.append((new_x, new_y))
+            current_points = smoothed
         
-        if is_closed:
-            smoothed.append(smoothed[0])
-        
-        return smoothed
+        return current_points
     
     def _estimate_curvature(self, points):
         """Estimate local curvature from a set of points."""
@@ -511,23 +525,28 @@ class BitmapToDXFConverter:
     
     def _simplify_adaptive(self, points, smoothing_amount, corner_threshold):
         """
-        Curvature-adaptive simplification.
-        Uses smaller tolerance on curves (preserves detail) and larger on straight lines (fewer nodes).
+        Curvature-adaptive simplification with aggressive line straightening.
+        High smoothing values will convert staircases into straight lines.
         """
         if len(points) <= 2:
             return points
         
         is_closed = self._points_equal(points[0], points[-1])
         
-        # Base tolerance scales with smoothing amount
-        # Higher smoothing = more simplification = fewer nodes
-        base_tolerance = 0.3 + smoothing_amount * 0.2
+        # First pass: Aggressive line straightening to remove staircase artifacts
+        # Higher smoothing = more aggressive straightening
+        if smoothing_amount >= 5:
+            points = self._straighten_lines(points, smoothing_amount)
         
-        # First, detect corners (sharp turns) that should always be preserved
+        if len(points) <= 2:
+            return points
+        
+        # Base tolerance scales with smoothing amount
+        base_tolerance = 0.5 + smoothing_amount * 0.3
+        
+        # Detect corners that should always be preserved
         corners = self._detect_corners(points, corner_threshold)
         corner_set = set(corners)
-        
-        # Add start/end points to preserved set
         corner_set.add(0)
         corner_set.add(len(points) - 1)
         
@@ -539,23 +558,18 @@ class BitmapToDXFConverter:
         last_added = 0
         
         for i in range(1, len(points) - 1):
-            # Always keep corners
             if i in corner_set:
                 result.append(points[i])
                 last_added = i
                 continue
             
-            # Calculate local curvature (average of nearby points)
             local_curvature = curvatures[i]
             
-            # Adaptive tolerance: small on curves, large on straight lines
-            # High curvature = small tolerance = keep more points
-            # Low curvature = large tolerance = remove more points
-            adaptive_tolerance = base_tolerance / (1.0 + local_curvature * 20)
-            adaptive_tolerance = max(0.1, min(base_tolerance * 3, adaptive_tolerance))
+            # Adaptive tolerance based on curvature
+            adaptive_tolerance = base_tolerance / (1.0 + local_curvature * 15)
+            adaptive_tolerance = max(0.2, min(base_tolerance * 4, adaptive_tolerance))
             
-            # Check if this point deviates enough from the line between last added and next corner
-            # Find next corner or end
+            # Find next anchor point
             next_anchor = len(points) - 1
             for j in range(i + 1, len(points)):
                 if j in corner_set:
@@ -565,11 +579,9 @@ class BitmapToDXFConverter:
             # Calculate distance from line
             dist = self._point_line_distance(points[i], points[last_added], points[next_anchor])
             
-            # Also consider distance traveled - don't skip too many points
+            # Segment length check
             segment_length = self._distance(points[last_added], points[i])
-            
-            # Keep point if it deviates enough OR we've traveled far enough
-            max_segment = 5.0 + (10.0 / (1.0 + local_curvature * 10))  # Shorter segments on curves
+            max_segment = 8.0 + (15.0 / (1.0 + local_curvature * 8))
             
             if dist > adaptive_tolerance or segment_length > max_segment:
                 result.append(points[i])
@@ -579,6 +591,72 @@ class BitmapToDXFConverter:
         
         # Close if original was closed
         if is_closed and not self._points_equal(result[0], result[-1]):
+            result.append(result[0])
+        
+        return result
+    
+    def _straighten_lines(self, points, smoothing_amount):
+        """
+        Aggressively remove points that lie on nearly straight lines.
+        This eliminates staircase artifacts on diagonal lines.
+        """
+        if len(points) <= 2:
+            return points
+        
+        is_closed = self._points_equal(points[0], points[-1])
+        
+        # Tolerance for considering points collinear
+        # Higher smoothing = more aggressive (larger tolerance)
+        collinear_tolerance = 0.3 + smoothing_amount * 0.15
+        
+        # Minimum segment length before we consider straightening
+        min_segment = max(3, 20 - smoothing_amount * 0.3)
+        
+        result = [points[0]]
+        segment_start = 0
+        
+        i = 1
+        while i < len(points) - 1:
+            # Try to extend the current segment as far as possible
+            # while all intermediate points remain within tolerance of the line
+            
+            best_end = i
+            
+            for j in range(i + 1, len(points)):
+                # Check if all points from segment_start to j are collinear
+                all_collinear = True
+                max_deviation = 0
+                
+                for k in range(segment_start + 1, j):
+                    dist = self._point_line_distance(points[k], points[segment_start], points[j])
+                    max_deviation = max(max_deviation, dist)
+                    if dist > collinear_tolerance:
+                        all_collinear = False
+                        break
+                
+                if all_collinear:
+                    best_end = j
+                else:
+                    break
+            
+            # If we found a longer straight segment, skip intermediate points
+            if best_end > i:
+                # Add the end of this straight segment
+                result.append(points[best_end])
+                segment_start = best_end
+                i = best_end + 1
+            else:
+                # No straight segment found, add current point
+                result.append(points[i])
+                segment_start = i
+                i += 1
+        
+        # Add the last point if not already added
+        if not self._points_equal(result[-1], points[-1]):
+            result.append(points[-1])
+        
+        # Close if original was closed
+        if is_closed and len(result) > 1 and not self._points_equal(result[0], result[-1]):
             result.append(result[0])
         
         return result
