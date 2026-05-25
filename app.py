@@ -244,6 +244,26 @@ st.markdown("""
     p, li, span, label, .stMarkdown {
         font-family: 'Source Sans Pro', sans-serif !important;
     }
+
+    /* The broad span rule above also hits Streamlit's Material icon <span>s,
+       which turns icon ligatures into literal words (e.g. the upload-cloud
+       icon shows the text "upload"). Restore the icon font for those spans. */
+    [data-testid="stIconMaterial"],
+    span[data-testid="stIconMaterial"],
+    .material-icons,
+    .material-symbols-outlined,
+    .material-symbols-rounded,
+    .material-symbols-sharp {
+        font-family: 'Material Symbols Rounded', 'Material Symbols Outlined',
+                     'Material Icons', sans-serif !important;
+        font-weight: normal !important;
+        font-style: normal !important;
+        letter-spacing: normal !important;
+        text-transform: none !important;
+        white-space: nowrap !important;
+        word-wrap: normal !important;
+        direction: ltr !important;
+    }
     
     /* Make all form labels legible */
     .stSelectbox label, .stNumberInput label, .stSlider label, 
@@ -876,36 +896,38 @@ def display_preview_with_zoom(preview_img, key):
 
     zoom_factor = int(zoom_level.replace("x", ""))
 
-    # Encode the preview once; the browser scales it up via CSS.
+    # Encode the preview as a PNG data URI.
     buffered = io.BytesIO()
     preview_img.save(buffered, format="PNG")
     img_b64 = base64.b64encode(buffered.getvalue()).decode()
 
-    # IMPORTANT: Streamlit injects a global  img { max-width: 100% }  rule.
-    # Without overriding it, any width we set is capped at 100% and the image
-    # just renders "fit" no matter what the slider says. The inline
-    # "max-width: none !important" defeats that rule. We also size in explicit
-    # pixels (relative to a fixed reference width) so the magnification is
-    # deterministic and does not depend on the column width.
-    base_width_px = 700
-    display_width_px = base_width_px * zoom_factor
+    # Why a <div> with a background-image instead of an <img>:
+    # Streamlit injects a global  img { max-width: 100% }  rule, so ANY <img>
+    # we add gets clamped to the column width and just renders "fit" no matter
+    # what width we ask for. A <div> background-image is not affected by that
+    # rule at all, and <div style="..."> is used reliably throughout this app.
+    # The HTML is also kept on a SINGLE LINE so Streamlit's markdown parser
+    # can't misread the indentation as a code block.
+    pw, ph = preview_img.size
+    base_width_px = 700                       # reference "fit" width
+    disp_w = base_width_px * zoom_factor      # explicit, deterministic size
+    disp_h = max(1, int(disp_w * ph / pw))
 
-    st.markdown(
-        f'''
-        <div style="max-height: 460px; overflow: auto; border: 1px solid #ccc;
-                    border-radius: 4px; background: #ffffff;">
-            <img src="data:image/png;base64,{img_b64}"
-                 style="width: {display_width_px}px !important;
-                        max-width: none !important;
-                        height: auto; display: block;
-                        image-rendering: pixelated;">
-        </div>
-        <div style="color: #666; font-size: 0.7rem; text-align: center; margin-top: 4px;">
-            {zoom_level} zoom • scroll to pan
-        </div>
-        ''',
-        unsafe_allow_html=True,
+    inner = (
+        f'<div style="width:{disp_w}px;height:{disp_h}px;'
+        f'background-image:url(data:image/png;base64,{img_b64});'
+        f'background-size:{disp_w}px {disp_h}px;background-repeat:no-repeat;'
+        f'image-rendering:pixelated;"></div>'
     )
+    outer = (
+        f'<div style="max-height:460px;overflow:auto;border:1px solid #ccc;'
+        f'border-radius:4px;background:#ffffff;">{inner}</div>'
+    )
+    caption = (
+        f'<div style="color:#666;font-size:0.7rem;text-align:center;'
+        f'margin-top:4px;">{zoom_level} zoom &bull; scroll to pan</div>'
+    )
+    st.markdown(outer + caption, unsafe_allow_html=True)
 
 
 # ============== MAIN APP ==============
@@ -1107,8 +1129,8 @@ with col_images:
                 outline_levels = st.slider("Contours", 2, 16, 2,
                     help="Number of gray levels for Outline mode. More levels = more detail but more complexity.")
             with c7:
-                smoothing = st.slider("Smooth", 0.0, 10.0, 2.0,
-                    help="Edge smoothing for Outline mode. Higher values create smoother, less jagged contours.")
+                smoothing = st.slider("Smooth", 0.0, 50.0, 2.0,
+                    help="Edge smoothing / node reduction for Outline mode. Higher values straighten staircase steps, reduce node count and shrink file size.")
         
         # Calculate parameters for preview
         w, h = image.size
@@ -1177,8 +1199,8 @@ with col_images:
                 outline_levels = st.slider("Contours", 2, 16, 2,
                     help="Number of gray levels for Outline mode. More levels = more detail but more complexity.", key="default_contours")
             with c7:
-                smoothing = st.slider("Smooth", 0.0, 10.0, 2.0,
-                    help="Edge smoothing for Outline mode. Higher values create smoother, less jagged contours.", key="default_smooth")
+                smoothing = st.slider("Smooth", 0.0, 50.0, 2.0,
+                    help="Edge smoothing / node reduction for Outline mode. Higher values straighten staircase steps, reduce node count and shrink file size.", key="default_smooth")
         
         # Calculate parameters for preview
         w, h = default_image.size
@@ -1606,4 +1628,3 @@ st.markdown("""
     </div>
 </div>
 """, unsafe_allow_html=True)
-
