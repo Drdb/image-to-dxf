@@ -876,17 +876,29 @@ def display_preview_with_zoom(preview_img, key):
 
     zoom_factor = int(zoom_level.replace("x", ""))
 
-    # Encode the preview once; the browser handles the magnification so the
-    # zoom is always exactly N times the fitted size (crisp, pixel-accurate).
+    # Encode the preview once; the browser scales it up via CSS.
     buffered = io.BytesIO()
     preview_img.save(buffered, format="PNG")
     img_b64 = base64.b64encode(buffered.getvalue()).decode()
 
+    # IMPORTANT: Streamlit injects a global  img { max-width: 100% }  rule.
+    # Without overriding it, any width we set is capped at 100% and the image
+    # just renders "fit" no matter what the slider says. The inline
+    # "max-width: none !important" defeats that rule. We also size in explicit
+    # pixels (relative to a fixed reference width) so the magnification is
+    # deterministic and does not depend on the column width.
+    base_width_px = 700
+    display_width_px = base_width_px * zoom_factor
+
     st.markdown(
         f'''
-        <div style="max-height: 420px; overflow: auto; border: 1px solid #ccc; border-radius: 4px; background: #ffffff;">
+        <div style="max-height: 460px; overflow: auto; border: 1px solid #ccc;
+                    border-radius: 4px; background: #ffffff;">
             <img src="data:image/png;base64,{img_b64}"
-                 style="width: {zoom_factor * 100}%; display: block; image-rendering: pixelated;">
+                 style="width: {display_width_px}px !important;
+                        max-width: none !important;
+                        height: auto; display: block;
+                        image-rendering: pixelated;">
         </div>
         <div style="color: #666; font-size: 0.7rem; text-align: center; margin-top: 4px;">
             {zoom_level} zoom • scroll to pan
@@ -1594,3 +1606,4 @@ st.markdown("""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
