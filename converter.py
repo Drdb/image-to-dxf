@@ -533,10 +533,11 @@ class BitmapToDXFConverter:
         
         is_closed = self._points_equal(points[0], points[-1])
         
-        # First pass: Aggressive line straightening to remove staircase artifacts
-        # Higher smoothing = more aggressive straightening
-        if smoothing_amount >= 5:
-            points = self._straighten_lines(points, smoothing_amount)
+        # First pass: line straightening to remove staircase artifacts.
+        # This now runs at every smoothing level (the tolerance inside scales
+        # from ~0 upward), so node count changes smoothly with the slider
+        # instead of jumping abruptly at smoothing = 5.
+        points = self._straighten_lines(points, smoothing_amount)
         
         if len(points) <= 2:
             return points
@@ -597,68 +598,66 @@ class BitmapToDXFConverter:
     
     def _straighten_lines(self, points, smoothing_amount):
         """
-        Aggressively remove points that lie on nearly straight lines.
-        This eliminates staircase artifacts on diagonal lines.
+        Remove points that lie within tolerance of a straight chord, using an
+        iterative Douglas-Peucker simplification.
+
+        This eliminates staircase artifacts on diagonal lines and reduces node
+        count / file size. Two design points:
+
+        * Performance: this is O(n log n) on typical contours, replacing the
+          previous greedy scan which was O(n^2) and made high-smoothing
+          conversions slow.
+        * Smooth response: the tolerance ramps continuously from ~0 (at
+          smoothing 0, only perfectly-redundant collinear points are dropped)
+          up to aggressive flattening at high smoothing. There is no longer an
+          abrupt jump in node count between low and high smoothing values.
         """
-        if len(points) <= 2:
+        n = len(points)
+        if n <= 2:
             return points
-        
+
         is_closed = self._points_equal(points[0], points[-1])
-        
-        # Tolerance for considering points collinear
-        # Higher smoothing = more aggressive (larger tolerance)
-        collinear_tolerance = 0.3 + smoothing_amount * 0.15
-        
-        # Minimum segment length before we consider straightening
-        min_segment = max(3, 20 - smoothing_amount * 0.3)
-        
-        result = [points[0]]
-        segment_start = 0
-        
-        i = 1
-        while i < len(points) - 1:
-            # Try to extend the current segment as far as possible
-            # while all intermediate points remain within tolerance of the line
-            
-            best_end = i
-            
-            for j in range(i + 1, len(points)):
-                # Check if all points from segment_start to j are collinear
-                all_collinear = True
-                max_deviation = 0
-                
-                for k in range(segment_start + 1, j):
-                    dist = self._point_line_distance(points[k], points[segment_start], points[j])
-                    max_deviation = max(max_deviation, dist)
-                    if dist > collinear_tolerance:
-                        all_collinear = False
-                        break
-                
-                if all_collinear:
-                    best_end = j
-                else:
-                    break
-            
-            # If we found a longer straight segment, skip intermediate points
-            if best_end > i:
-                # Add the end of this straight segment
-                result.append(points[best_end])
-                segment_start = best_end
-                i = best_end + 1
-            else:
-                # No straight segment found, add current point
-                result.append(points[i])
-                segment_start = i
-                i += 1
-        
-        # Add the last point if not already added
-        if not self._points_equal(result[-1], points[-1]):
-            result.append(points[-1])
-        
-        # Close if original was closed
+
+        # Tolerance grows linearly with smoothing. At smoothing 0 it is
+        # effectively zero so the outline is preserved; as smoothing rises the
+        # staircase steps are progressively collapsed into straight runs.
+        epsilon = smoothing_amount * 0.15
+        if epsilon <= 0.0:
+            epsilon = 1e-9  # still removes exactly-collinear redundant points
+
+        # Iterative Douglas-Peucker (stack based, so no recursion-depth limit
+        # on very long contours). Endpoints are always kept.
+        keep = [False] * n
+        keep[0] = True
+        keep[n - 1] = True
+
+        stack = [(0, n - 1)]
+        while stack:
+            start, end = stack.pop()
+            if end <= start + 1:
+                continue
+
+            a = points[start]
+            b = points[end]
+            max_dist = -1.0
+            max_idx = -1
+            for k in range(start + 1, end):
+                d = self._point_line_distance(points[k], a, b)
+                if d > max_dist:
+                    max_dist = d
+                    max_idx = k
+
+            if max_idx != -1 and max_dist > epsilon:
+                keep[max_idx] = True
+                stack.append((start, max_idx))
+                stack.append((max_idx, end))
+
+        result = [points[i] for i in range(n) if keep[i]]
+
+        # Preserve closure if the contour was closed.
         if is_closed and len(result) > 1 and not self._points_equal(result[0], result[-1]):
             result.append(result[0])
-        
+
         return result
     
     def _calculate_all_curvatures(self, points):
