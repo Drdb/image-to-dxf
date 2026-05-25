@@ -856,6 +856,46 @@ def generate_preview(image, mode, threshold, invert, flip_y, line_step, brightne
     return preview
 
 
+def display_preview_with_zoom(preview_img, key):
+    """Display the DXF preview with a working zoom slider.
+
+    Fit  -> image scaled to fit the column (default behaviour).
+    2x/4x/8x -> preview shown inside a scrollable panel at the chosen
+    magnification so staircase / detail artifacts are visible.
+    """
+    zoom_level = st.select_slider(
+        "🔍 Zoom Preview",
+        options=["Fit", "2x", "4x", "8x"],
+        value="Fit",
+        key=key,
+    )
+
+    if zoom_level == "Fit":
+        st.image(preview_img, use_container_width=True)
+        return
+
+    zoom_factor = int(zoom_level.replace("x", ""))
+
+    # Encode the preview once; the browser handles the magnification so the
+    # zoom is always exactly N times the fitted size (crisp, pixel-accurate).
+    buffered = io.BytesIO()
+    preview_img.save(buffered, format="PNG")
+    img_b64 = base64.b64encode(buffered.getvalue()).decode()
+
+    st.markdown(
+        f'''
+        <div style="max-height: 420px; overflow: auto; border: 1px solid #ccc; border-radius: 4px; background: #ffffff;">
+            <img src="data:image/png;base64,{img_b64}"
+                 style="width: {zoom_factor * 100}%; display: block; image-rendering: pixelated;">
+        </div>
+        <div style="color: #666; font-size: 0.7rem; text-align: center; margin-top: 4px;">
+            {zoom_level} zoom • scroll to pan
+        </div>
+        ''',
+        unsafe_allow_html=True,
+    )
+
+
 # ============== MAIN APP ==============
 
 # Hero header
@@ -1081,7 +1121,7 @@ with col_images:
                 st.markdown('<div class="image-container" style="background: #ffffff;">', unsafe_allow_html=True)
                 st.markdown('<div class="image-label" style="color: #1a1a2e;">DXF Preview</div>', unsafe_allow_html=True)
                 preview_img = generate_preview(image, mode, threshold, invert, flip_y, line_step, brightness, contrast, outline_levels, smoothing)
-                st.image(preview_img, use_container_width=True)
+                display_preview_with_zoom(preview_img, key="zoom_uploaded")
                 st.markdown('</div>', unsafe_allow_html=True)
             
             # Compact stats - single line with processing note
@@ -1151,7 +1191,7 @@ with col_images:
                 st.markdown('<div class="image-container" style="background: #ffffff;">', unsafe_allow_html=True)
                 st.markdown('<div class="image-label" style="color: #1a1a2e;">DXF Preview</div>', unsafe_allow_html=True)
                 preview_img = generate_preview(default_image, mode, threshold, invert, flip_y, line_step, brightness, contrast, outline_levels, smoothing)
-                st.image(preview_img, use_container_width=True)
+                display_preview_with_zoom(preview_img, key="zoom_default")
                 st.markdown('</div>', unsafe_allow_html=True)
             
             # Compact stats - single line with processing note
