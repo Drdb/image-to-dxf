@@ -882,7 +882,16 @@ def display_preview_with_zoom(preview_img, key):
     Fit  -> image scaled to fit the column (default behaviour).
     2x/4x/8x -> preview shown inside a scrollable panel at the chosen
     magnification so staircase / detail artifacts are visible.
+
+    Layout note: the image is rendered into a placeholder that is reserved
+    BEFORE the slider is created. That way the slider sits below the image
+    instead of above it, so the DXF preview image aligns horizontally with
+    the original / example image in the left column.
     """
+    # Reserve the spot where the image will go, so the slider that comes
+    # next renders visually below it.
+    img_slot = st.empty()
+
     zoom_level = st.select_slider(
         "🔍 Zoom Preview",
         options=["Fit", "2x", "4x", "8x"],
@@ -890,44 +899,44 @@ def display_preview_with_zoom(preview_img, key):
         key=key,
     )
 
-    if zoom_level == "Fit":
-        st.image(preview_img, use_container_width=True)
-        return
+    with img_slot.container():
+        if zoom_level == "Fit":
+            st.image(preview_img, use_container_width=True)
+        else:
+            zoom_factor = int(zoom_level.replace("x", ""))
 
-    zoom_factor = int(zoom_level.replace("x", ""))
+            # Encode the preview as a PNG data URI.
+            buffered = io.BytesIO()
+            preview_img.save(buffered, format="PNG")
+            img_b64 = base64.b64encode(buffered.getvalue()).decode()
 
-    # Encode the preview as a PNG data URI.
-    buffered = io.BytesIO()
-    preview_img.save(buffered, format="PNG")
-    img_b64 = base64.b64encode(buffered.getvalue()).decode()
+            # Why a <div> with a background-image instead of an <img>:
+            # Streamlit injects a global  img { max-width: 100% }  rule, so ANY <img>
+            # we add gets clamped to the column width and just renders "fit" no matter
+            # what width we ask for. A <div> background-image is not affected by that
+            # rule at all, and <div style="..."> is used reliably throughout this app.
+            # The HTML is also kept on a SINGLE LINE so Streamlit's markdown parser
+            # can't misread the indentation as a code block.
+            pw, ph = preview_img.size
+            base_width_px = 700                       # reference "fit" width
+            disp_w = base_width_px * zoom_factor      # explicit, deterministic size
+            disp_h = max(1, int(disp_w * ph / pw))
 
-    # Why a <div> with a background-image instead of an <img>:
-    # Streamlit injects a global  img { max-width: 100% }  rule, so ANY <img>
-    # we add gets clamped to the column width and just renders "fit" no matter
-    # what width we ask for. A <div> background-image is not affected by that
-    # rule at all, and <div style="..."> is used reliably throughout this app.
-    # The HTML is also kept on a SINGLE LINE so Streamlit's markdown parser
-    # can't misread the indentation as a code block.
-    pw, ph = preview_img.size
-    base_width_px = 700                       # reference "fit" width
-    disp_w = base_width_px * zoom_factor      # explicit, deterministic size
-    disp_h = max(1, int(disp_w * ph / pw))
-
-    inner = (
-        f'<div style="width:{disp_w}px;height:{disp_h}px;'
-        f'background-image:url(data:image/png;base64,{img_b64});'
-        f'background-size:{disp_w}px {disp_h}px;background-repeat:no-repeat;'
-        f'image-rendering:pixelated;"></div>'
-    )
-    outer = (
-        f'<div style="max-height:460px;overflow:auto;border:1px solid #ccc;'
-        f'border-radius:4px;background:#ffffff;">{inner}</div>'
-    )
-    caption = (
-        f'<div style="color:#666;font-size:0.7rem;text-align:center;'
-        f'margin-top:4px;">{zoom_level} zoom &bull; scroll to pan</div>'
-    )
-    st.markdown(outer + caption, unsafe_allow_html=True)
+            inner = (
+                f'<div style="width:{disp_w}px;height:{disp_h}px;'
+                f'background-image:url(data:image/png;base64,{img_b64});'
+                f'background-size:{disp_w}px {disp_h}px;background-repeat:no-repeat;'
+                f'image-rendering:pixelated;"></div>'
+            )
+            outer = (
+                f'<div style="max-height:460px;overflow:auto;border:1px solid #ccc;'
+                f'border-radius:4px;background:#ffffff;">{inner}</div>'
+            )
+            caption = (
+                f'<div style="color:#666;font-size:0.7rem;text-align:center;'
+                f'margin-top:4px;">{zoom_level} zoom &bull; scroll to pan</div>'
+            )
+            st.markdown(outer + caption, unsafe_allow_html=True)
 
 
 # ============== MAIN APP ==============
